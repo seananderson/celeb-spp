@@ -26,7 +26,7 @@ glimpse(d)
 
 names(d) <- tolower(names(d))
 d$taxonomic_group <- as.factor(d$taxonomic_group)
-d <- select(d, -amphibian, -bird, -fish, -invertebrate, -mammal, -reptile)
+# d <- select(d, -amphibian, -bird, -fish, -invertebrate, -mammal, -reptile)
 
 ggplot(d, aes(as.factor(celebrity), log10(species_average_daily_view + 1))) +
   geom_boxplot()
@@ -75,16 +75,16 @@ summary(m1)
 b <- coef(m1)
 b$cond$taxonomic_group
 
-b <- broom.mixed::tidy(m1, effects = "ran_vals")
-filter(b, term == "celebrity") %>%
-  ggplot(aes(estimate,
-    y = level,
-    xmin = estimate - 2 * std.error, xmax = estimate + 2 * std.error
-  )) +
-  geom_pointrange() +
-  geom_vline(xintercept = 0, lty = 2)
-
-res1 <- DHARMa::simulateResiduals(m1, plot = TRUE)
+# b <- broom.mixed::tidy(m1, effects = "ran_vals")
+# filter(b, term == "celebrity") %>%
+#   ggplot(aes(estimate,
+#     y = level,
+#     xmin = estimate - 2 * std.error, xmax = estimate + 2 * std.error
+#   )) +
+#   geom_pointrange() +
+#   geom_vline(xintercept = 0, lty = 2)
+#
+# res1 <- DHARMa::simulateResiduals(m1, plot = TRUE)
 
 # maybe with dispersion varying by taxa?
 m1.1 <- glmmTMB(
@@ -99,6 +99,7 @@ res1.1 <- DHARMa::simulateResiduals(m1.1, plot = TRUE)
 AIC(m1, m1.1)
 b <- broom.mixed::tidy(m1.1, effects = "ran_vals")
 filter(b, term == "celebrity") %>%
+  mutate(estimate = estimate + fixef(m1.1)$cond[[2]]) %>%
   ggplot(aes(exp(estimate),
     y = level,
     xmin = exp(estimate - 2 * std.error), xmax = exp(estimate + 2 * std.error)
@@ -116,14 +117,6 @@ m1.2 <- glmmTMB(
 )
 summary(m1.2)
 res1.2 <- DHARMa::simulateResiduals(m1.2, plot = TRUE)
-b <- broom.mixed::tidy(m1.2, effects = "ran_vals")
-filter(b, term == "celebrity") %>%
-  ggplot(aes(estimate,
-    y = level,
-    xmin = estimate - 2 * std.error, xmax = estimate + 2 * std.error
-  )) +
-  geom_pointrange() +
-  geom_vline(xintercept = 0, lty = 2)
 
 # m2 <- glmmTMB(
 #   species_total_views ~ 1 + celebrity +
@@ -134,12 +127,12 @@ filter(b, term == "celebrity") %>%
 # res2 <- DHARMa::simulateResiduals(m2, plot = TRUE)
 
 # paired; continuous wiki counts:
-d$celeb_views_scaled <- as.numeric(scale(d$celeb_total_views))
+d$log_celeb_views <- log(d$celeb_total_views)
 d_celeb <- filter(d, celebrity == 1)
 
 m3 <- glmmTMB(
-  species_total_views ~ 1 + celeb_views_scaled +
-    (1 + celeb_views_scaled | taxonomic_group),
+  species_total_views ~ 1 + log_celeb_views +
+    (1 + log_celeb_views | taxonomic_group),
   data = d_celeb, family = glmmTMB::nbinom2(), verbose = TRUE
 )
 summary(m3)
@@ -148,10 +141,11 @@ b <- coef(m3)
 b$cond$taxonomic_group
 
 b <- broom.mixed::tidy(m3, effects = "ran_vals")
-filter(b, term == "celeb_views_scaled") %>%
-  ggplot(aes(exp(estimate),
+filter(b, term == "log_celeb_views") %>%
+  mutate(estimate = estimate + fixef(m3)$cond[[2]]) %>%
+  ggplot(aes(estimate,
     y = level,
-    xmin = exp(estimate - 2 * std.error), xmax = exp(estimate + 2 * std.error)
+    xmin = estimate - 2 * std.error, xmax = estimate + 2 * std.error
   )) +
   geom_pointrange() +
-  geom_vline(xintercept = 1, lty = 2)
+  geom_vline(xintercept = 0, lty = 2)
