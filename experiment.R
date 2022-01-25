@@ -126,7 +126,7 @@ res1.2 <- DHARMa::simulateResiduals(m1.2, plot = TRUE)
 # summary(m2)
 # res2 <- DHARMa::simulateResiduals(m2, plot = TRUE)
 
-# paired; continuous wiki counts:
+# continuous wiki counts:
 d$log_celeb_views <- log(d$celeb_total_views)
 d_celeb <- filter(d, celebrity == 1)
 
