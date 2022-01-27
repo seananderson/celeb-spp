@@ -60,6 +60,12 @@ ggplot(d, aes(as.factor(celebrity), log10(species_average_daily_view + 1))) +
 
 # all same time for views?
 range(d$celeb_total_views / d$celeb_average_daily_view, na.rm = TRUE)
+range(d$species_total_views / d$species_average_daily_view, na.rm = TRUE)
+x <- d$species_total_views / d$species_average_daily_view
+x <- x / 365.25
+x <- x[is.finite(x)]
+x <- x[!is.na(x)]
+hist(x, breaks = 100, main = "(celeb_total_views/celeb_average_daily_view)/365")
 
 table(d$serial_number) %>% unique()
 table(d$taxonomic_group)
@@ -126,7 +132,91 @@ res1.2 <- DHARMa::simulateResiduals(m1.2, plot = TRUE)
 # summary(m2)
 # res2 <- DHARMa::simulateResiduals(m2, plot = TRUE)
 
-# continuous wiki counts:
+# continuous response distribution with dispersion varying by taxa? ------------
+dpos <- d |>
+  group_by(serial_number) |>
+  mutate(any_zero = 0 %in% species_average_daily_view) |>
+  filter(!any_zero)
+  ungroup()
+nrow(d) - nrow(dpos)
+
+m1.3 <- glmmTMB(
+  species_average_daily_view ~ 1 + celebrity +
+    (1 + celebrity | taxonomic_group) + (1 | serial_number),
+  dispformula = ~ 0 + taxonomic_group,
+  data = dpos, family = Gamma(link = "log"), verbose = TRUE
+)
+m1.3$sdr
+summary(m1.3)
+b <- coef(m1.3)
+b$cond$taxonomic_group
+res1.3 <- DHARMa::simulateResiduals(m1.3, plot = TRUE)
+b <- broom.mixed::tidy(m1.3, effects = "ran_vals")
+filter(b, term == "celebrity") %>%
+  mutate(estimate = estimate + fixef(m1.3)$cond[[2]]) %>%
+  ggplot(aes(exp(estimate),
+    y = level,
+    xmin = exp(estimate - 2 * std.error), xmax = exp(estimate + 2 * std.error)
+  )) +
+  geom_pointrange() +
+  geom_vline(xintercept = 1, lty = 2)
+
+# go brms? --------------------------------
+library(brms)
+# library(future)
+# plan(multisession)
+# fit1 <- brm(bf(symptom_post ~ group, sigma ~ group),
+  # data = dat1, family = gaussian())
+
+get_prior(bf(
+  species_average_daily_view ~ 1 + celebrity +
+    (1 + celebrity | taxonomic_group) + (1 | serial_number),
+  shape ~ 0 + as.factor(taxonomic_group)),
+  data = dpos, family = Gamma(link = "log"))
+
+priors <-
+  prior(normal(0, 1), class = "b") +
+  prior(normal(0, 5), class = "Intercept") +
+  prior(student_t(3, 0, 2.5), class = "sd") +
+  prior(student_t(3, 0, 2.5), class = "b", dpar = "shape") +
+  prior(lkj_corr_cholesky(1), class = "L")
+
+fit_brms1.4 <- brm(
+  bf(species_average_daily_view ~ 1 + celebrity +
+      (1 + celebrity | taxonomic_group) + (1 | serial_number),
+    shape ~ 0 + as.factor(taxonomic_group)),
+  data = dpos,
+  family = Gamma(link = "log"),
+  backend = "cmdstanr",
+  iter = 800L,
+  chains = 6L,
+  cores = future::availableCores(logical = FALSE),
+  prior = priors
+)
+fit_brms1.4
+# 3 divergences! look at shape parameter model/increase adapt_delta from 0.8
+
+loo::loo(fit_brms1.3)
+loo::loo(fit_brms1.4)
+
+p1 <- tidybayes::spread_draws(fit_brms1.4, r_taxonomic_group[taxa, param])
+p2 <- tidybayes::spread_draws(fit_brms1.4, b_celebrity)
+
+p1_celeb <- filter(p1, param == "celebrity") |>
+  left_join(p2)
+
+ggplot(p1_celeb, aes(taxa, exp(b_celebrity + r_taxonomic_group))) +
+  geom_hline(yintercept = 1, lty = 2) +
+  geom_violin(fill = NA) +
+  coord_flip() + xlab("") + ylab("Rating") +
+  theme_light()
+
+group_by(p1_celeb, taxa) |>
+  mutate(theta = exp(b_celebrity + r_taxonomic_group)) |>
+  summarise(prob_gt_one = mean(theta > 1), CI95_lwr = quantile(theta, 0.025), median = quantile(theta, 0.5), CI95_upr = quantile(theta, 0.975)) |>
+  knitr::kable(digits = 2L)
+
+# continuous wiki counts: -----------------------------
 d$log_celeb_views <- log(d$celeb_total_views)
 d_celeb <- filter(d, celebrity == 1)
 
