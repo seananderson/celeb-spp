@@ -136,7 +136,7 @@ res1.2 <- DHARMa::simulateResiduals(m1.2, plot = TRUE)
 dpos <- d |>
   group_by(serial_number) |>
   mutate(any_zero = 0 %in% species_average_daily_view) |>
-  filter(!any_zero)
+  filter(!any_zero) |>
   ungroup()
 nrow(d) - nrow(dpos)
 
@@ -154,6 +154,49 @@ res1.3 <- DHARMa::simulateResiduals(m1.3, plot = TRUE)
 b <- broom.mixed::tidy(m1.3, effects = "ran_vals")
 filter(b, term == "celebrity") %>%
   mutate(estimate = estimate + fixef(m1.3)$cond[[2]]) %>%
+  ggplot(aes(exp(estimate),
+    y = level,
+    xmin = exp(estimate - 2 * std.error), xmax = exp(estimate + 2 * std.error)
+  )) +
+  geom_pointrange() +
+  geom_vline(xintercept = 1, lty = 2)
+
+# what about for the upper 50% of celebrities? ------------------------
+
+.med <- median(dpos$celeb_average_daily_view, na.rm = TRUE)
+.mean <- mean(dpos$celeb_average_daily_view, na.rm = TRUE)
+.quant80 <- as.numeric(quantile(dpos$celeb_average_daily_view, probs = 0.8, na.rm = TRUE))
+
+dpos <- dpos |>
+  group_by(serial_number) |>
+  mutate(above_med = max(celeb_average_daily_view, na.rm = TRUE) >= .med ) |>
+  mutate(above_mean = max(celeb_average_daily_view, na.rm = TRUE) >= .mean) |>
+  mutate(above_80quant = max(celeb_average_daily_view, na.rm = TRUE) >= .quant80) |>
+  ungroup()
+
+dpos_med <- filter(dpos, above_med)
+dpos_mean <- filter(dpos, above_mean)
+dpos_quant <- filter(dpos, above_80quant)
+
+nrow(dpos)
+nrow(dpos_med)
+nrow(dpos_mean)
+nrow(dpos_quant)
+
+m1.4 <- glmmTMB(
+  species_average_daily_view ~ 1 + celebrity +
+    (1 + celebrity | taxonomic_group) + (1 | serial_number),
+  # dispformula = ~ 0 + taxonomic_group,
+  data = dpos_med, family = Gamma(link = "log"), verbose = TRUE
+)
+m1.4$sdr
+summary(m1.4)
+b <- coef(m1.4)
+b$cond$taxonomic_group
+# res1.4 <- DHARMa::simulateResiduals(m1.4, plot = TRUE)
+b <- broom.mixed::tidy(m1.4, effects = "ran_vals")
+filter(b, term == "celebrity") %>%
+  mutate(estimate = estimate + fixef(m1.4)$cond[[2]]) %>%
   ggplot(aes(exp(estimate),
     y = level,
     xmin = exp(estimate - 2 * std.error), xmax = exp(estimate + 2 * std.error)
