@@ -14,13 +14,20 @@ source("1-prep-data.R")
 #     (1 + celebrity | taxonomic_group) + (1 | serial_number)),
 #   data = dpos, family = Gamma(link = "log"))
 
-# get_prior(bf(
-#   log(species_average_daily_view) ~ 1 + celebrity +
-#     (1 + celebrity | taxonomic_group) + (1 | serial_number), nu = 5),
-#   data = dpos, family = student())
+get_prior(bf(
+  log(species_average_daily_view) ~ 1 + celebrity +
+    (1 + celebrity | taxonomic_group) + (1 | serial_number), nu = 5),
+  data = dpos, family = student())
+
+get_prior(bf(
+  species_average_daily_view ~ 1 + celebrity +
+    (1 + celebrity | taxonomic_group) + (1 | serial_number)),
+  data = dpos, family = negbinomial())
+
+
 
 fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
-  family = c("Gamma", "Student"), .nu = 5) {
+  family = c("Gamma", "Student", "NB2"), .nu = 5) {
 
   family <- match.arg(family)
 
@@ -30,7 +37,10 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
   if (family == "Student") {
     .family <- student
   }
-  # bf(y ~ 1 + x, nu = 4)
+  if (family == "NB2") {
+    .family <- brms::negbinomial()
+  }
+
 
   priors <-
     prior(normal(0, 1), class = "b") +
@@ -55,22 +65,35 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
 
   if (family == "Student") {
     if (model_disp) {
-      priors <- priors + prior(student_t(3, 0, 2.5), class = "b", dpar = "sigma")
+      priors <- priors + prior(student_t(3, 0, 2.5), class = "b", dpar = "sigma") +
+        prior(gamma(2, 0.1), class = "nu")
+          # prior(gamma(4, 1),   class = nu),
       f <-  bf(log(species_average_daily_view) ~
           1 + celebrity +
           (1 + celebrity | taxonomic_group) + (1 | serial_number),
-        shape ~ 0 + taxonomic_group, nu = .nu)
+        shape ~ 0 + taxonomic_group)
     } else {
-      priors <- priors + prior(student_t(3, 0, 2.5), class = "sigma")
+      priors <- priors + prior(student_t(3, 0, 2.5), class = "sigma") +
+        prior(gamma(2, 0.1), class = "nu")
       f <-  bf(log(species_average_daily_view) ~
           1 + celebrity +
-          (1 + celebrity | taxonomic_group) + (1 | serial_number), nu = .nu)
+          (1 + celebrity | taxonomic_group) + (1 | serial_number))
     }
   }
 
+
+  if (family == "NB2") {
+    priors <- priors + prior(gamma(0.01, 0.01), class = "shape")
+    f <-  bf(species_total_views ~
+        1 + celebrity +
+        (1 + celebrity | taxonomic_group) + (1 | serial_number))
+  }
+
+
+
   brm(
     formula = f,
-    data = dpos,
+    data = dat,
     family = .family,
     backend = "cmdstanr",
     iter = iter,
@@ -86,13 +109,44 @@ fit2 <- fit_brms_mod(dpos, iter = 200, model_disp = TRUE)
 # loo::loo(fit1, fit2)
 
 fit_1000 <- fit_brms_mod(dpos_1000, iter = 300, model_disp = FALSE, chains = 1)
-fit_1000_t <- fit_brms_mod(dpos_1000, iter = 300, model_disp = FALSE, chains = 1, family = "Student", .nu = 5)
+fit_1000_t <- fit_brms_mod(dpos_1000, iter = 200, model_disp = FALSE, chains = 1, family = "Student", .nu = 9)
+
+fit1_t <- fit_brms_mod(dpos, iter = 250, model_disp = FALSE, chains = 1, .nu = 3, family = "Student")
+
+fit1_nb <- fit_brms_mod(d, iter = 250, model_disp = FALSE, chains = 1, family = "NB2")
+
+# plotting ----------------------
 
 # shinystan::launch_shinystan(fit1)
-# ----------------------
 
-# pp_check(fit1) + scale_x_log10()
-pp_check(fit_1000_t) + scale_x_log10()
+pp_check(fit1_nb, ndraws = 100) + scale_x_log10()
+
+pp_check(fit1_t, ndraws = 100)
+pp_check(fit1_t, ndraws = 100) + coord_fixed(xlim = c(-10, 10))
+pp_check(fit1_t, ndraws = 100) + xlim(-10, 10)
+pp_check(fit1, ndraws = 100) + scale_x_log10()
+
+pp_check(fit_1000_t, ndraws = 100)
+pp_check(fit_1000_t, ndraws = 100) + xlim(-10, 10)
+pp_check(fit_1000, ndraws = 100) + scale_x_log10()
+
+p1t <- brms::posterior_predict(fit1_t, ndraws = 100)
+dim(p1t[,])
+mean(apply(p1t, 1, min))
+mean(apply(p1t, 1, max))
+range(log(dpos$species_average_daily_view))
+
+p1 <- brms::posterior_predict(fit1, ndraws = 100)
+mean(apply(log(p1), 1, min))
+mean(apply(log(p1), 1, max))
+range(log(dpos$species_average_daily_view))
+
+p1nb <- brms::posterior_predict(fit1_nb, ndraws = 100)
+mean(apply(p1nb, 1, min))
+mean(apply(p1nb, 1, max))
+range(dpos$species_average_daily_view)
+# hist(p1nb[,2])
+# hist(p1nb[,2])
 
 get_draws <- function(fit) {
   p1 <- tidybayes::spread_draws(fit, r_taxonomic_group[taxa, param])
@@ -119,8 +173,12 @@ make_prob_table <- function(draws_df) {
 }
 
 get_draws(fit_1000) %>% plot_violins()
-get_draws(fit_1000) %>% make_prob_table()
+get_draws(fit_1000_t) %>% plot_violins()
 
+get_draws(fit1_nb) %>% plot_violins()
 get_draws(fit1) %>% plot_violins()
-get_draws(fit1) %>% make_prob_table()
+get_draws(fit1_t) %>% plot_violins()
 
+get_draws(fit1) %>% make_prob_table()
+get_draws(fit1_t) %>% make_prob_table()
+get_draws(fit_1000_t) %>% make_prob_table()
