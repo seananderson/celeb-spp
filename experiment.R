@@ -1,6 +1,9 @@
 library(tidyverse)
 library(glmmTMB)
+options(glmmTMB.cores = 4L)
 library(DHARMa)
+library(brms)
+library(dplyr)
 
 # 8000 strong dataset, half of which consists of species named after celebrity
 # (defined as a person who has a Wikipedia page with an average of 1 visit a day
@@ -70,11 +73,17 @@ hist(x, breaks = 100, main = "(celeb_total_views/celeb_average_daily_view)/365")
 table(d$serial_number) %>% unique()
 table(d$taxonomic_group)
 
+d$years <- (d$celeb_total_views / d$celeb_average_daily_view) / 365.25
+mean(d$years, na.rm = T)
+median(d$years, na.rm = T)
+range(d$years, na.rm = T)
+
 # paired:
+
 m1 <- glmmTMB(
   species_total_views ~ 1 + celebrity +
     (1 + celebrity | taxonomic_group) + (1 | serial_number),
-  data = d, family = glmmTMB::nbinom2(), verbose = TRUE
+  data = d, family = glmmTMB::nbinom2(), verbose = F
 )
 m1$sdr
 summary(m1)
@@ -187,7 +196,7 @@ m1.4 <- glmmTMB(
   species_average_daily_view ~ 1 + celebrity +
     (1 + celebrity | taxonomic_group) + (1 | serial_number),
   # dispformula = ~ 0 + taxonomic_group,
-  data = dpos_med, family = Gamma(link = "log"), verbose = TRUE
+  data = dpos_mean, family = Gamma(link = "log"), verbose = TRUE
 )
 m1.4$sdr
 summary(m1.4)
@@ -205,7 +214,6 @@ filter(b, term == "celebrity") %>%
   geom_vline(xintercept = 1, lty = 2)
 
 # go brms? --------------------------------
-library(brms)
 # library(future)
 # plan(multisession)
 # fit1 <- brm(bf(symptom_post ~ group, sigma ~ group),
@@ -224,10 +232,12 @@ priors <-
   prior(student_t(3, 0, 2.5), class = "b", dpar = "shape") +
   prior(lkj_corr_cholesky(1), class = "L")
 
+dpos$taxonomic_group_fac <- as.factor(dpos$taxonomic_group)
 fit_brms1.4 <- brm(
-  bf(species_average_daily_view ~ 1 + celebrity +
+  bf(species_average_daily_view ~
+      1 + celebrity +
       (1 + celebrity | taxonomic_group) + (1 | serial_number),
-    shape ~ 0 + as.factor(taxonomic_group)),
+    shape ~ 0 + taxonomic_group_fac),
   data = dpos,
   family = Gamma(link = "log"),
   backend = "cmdstanr",
