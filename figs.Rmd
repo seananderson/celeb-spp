@@ -1,0 +1,156 @@
+---
+title: "Species with celebrity names"
+author: ""
+output:
+  # bookdown::word_document2:
+  bookdown::pdf_document2:
+  toc: false
+number_sections: false
+fig_caption: true
+highlight: "monochrome"
+---
+  
+```{r setup, include=FALSE}
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  collapse = TRUE,
+  comment = "#>"
+)
+library(knitr)
+library(here)
+```
+
+# Supplementary methods
+
+We fit Bayesian hierarchical generalized linear mix effects models (GLMMs) to assess the effect of species being named after celebrities on Wikipedia view counts.
+These GLMMs were constructed with random intercepts to account for the paired nature of species matched based on TODO.
+
+We considered two forms of observation error: 
+(1) Student-t observation error on the (natural) log of average species daily views on Wikipedia, and
+(2) negative binomial ('NB2' [REF]) observation error on total number of species views.
+The first option models a continuous value (log of average species daily views) with a heavy-tailed observation error distribution.
+This option is also closest to the preregistered methodological approach.
+We were unable to use a simple Gaussian error distribution as noted in the preregistration because of the heavy-tailed nature of the observations (the confidence intervals would have been overly precise and the parameters biased by rare outlying values).
+The second toption is a count distribution where the observation variance grows quadratically with the expected value.
+This maintains the integer nature of the data generating process, but may not sufficiently account for outliers.
+
+Starting with the Student-t model, our model was of the form:
+\begin{align}
+\log(y_i) &\sim \mathrm{Student-t} \left( \nu, \mu_i, \sigma \right),\\
+\mu_i &= \alpha + \alpha_j + \delta_s + \beta C_i + \beta_j C_i,
+\end{align}
+where $y_i$ represents the response variable (average species daily views) for observation $i$, 
+$\mu$ represents the expected value (mean), and $\sigma$ represents a scale parameter.
+The parameter $\alpha$ is a global intercept,
+$\alpha_j$ is a taxa-specific (indexed by $j$) intercept, and 
+$\delta_s$ is a matched species ID (indexed by $s$) intercept.
+The coefficient $\beta$ is a global effect of celebrity status ($C$, $C = 0$ if a non-celebrity, $C = 1$ if a celebrity) and 
+$\beta_j$ is a taxa-specific effect of celebrity status.
+The variable $\epsilon_i$ represents observation error for observation $i$ and was assumed drawn from a heavy-tailed Student-t distribution with $\nu = 4$ to account for occasional outliers.
+We chose $\nu = 4$ based on posterior predictive of checks.
+
+We constrained the taxa-specific intercepts $\alpha_j$, taxa-specific slopes $\beta_j$, and the celebrity/species-specific intercepts $\delta_s$ according to normal distributions:
+\begin{align}
+\alpha_{j} &\sim \mathrm{Normal} \left(0, \tau_{\alpha}^2 \right),\\
+\beta_{j} &\sim \mathrm{Normal} \left(0, \tau_{\beta}^2 \right),\\
+\delta_{s} &\sim \mathrm{Normal} \left(0, \tau_{\delta}^2 \right).
+\end{align}
+
+We placed the following weakly-informative priors on the estimated parameters:
+\begin{align}
+\beta &\sim \mathrm{Normal \left(0, 1 \right)},\\
+\alpha &\sim \mathrm{Normal \left(0, 5 \right)},\\
+\sigma &\sim \mathrm{Student-t \left(3, 0, 2.5 \right)},\\
+\tau_{\alpha} &\sim \mathrm{Student-t \left(3, 0, 2.5 \right)},\\
+\tau_{\beta} &\sim \mathrm{Student-t \left(3, 0, 2.5 \right)},\\
+\tau_{\delta} &\sim \mathrm{Student-t \left(3, 0, 2.5 \right)}.
+\end{align}
+
+We placed an $\mathrm{LKJ}(1)$ prior on the correlation between $\beta_{j}$ and $\alpha_{j}$ as is the default in the package brms (REF).
+
+The negative binomial model was the same except for the main equation:
+\begin{align}
+y_i &\sim \mathrm{NB2} \left( \mu_i, \phi \right),\\
+\log (\mu_i) &\sim \alpha + \alpha_j + \delta_s + \beta C_i + \beta_j C_i,
+\end{align}
+where $y_i$ represents counts of page views.
+We placed a $\mathrm{Student-t} \left(3, 0, 5 \right)$ prior on the shape parameter $\phi$.
+
+We fit and alternative version of the Student-t model where the $\alpha_j$ and $\beta_j$ were not constrained by a normal distribution.
+In this case, these parameters were estimated independently.
+This was to assess the degree to which the taxa with the most data were affecting inference for the data with fewer data due the hierarchical model.
+This version of the model retained the random intercept for $\delta_i$ to account for the paired nature of the data.
+
+```{r eval=FALSE}
+  priors <-
+    prior(normal(0, 1), class = "b") +
+    prior(normal(0, 5), class = "Intercept") +
+    prior(student_t(3, 0, 2.5), class = "sd") +
+    prior(lkj_corr_cholesky(1), class = "L")
+
+   priors <- priors + prior(student_t(3, 0, 2.5), class = "sigma")
+          # prior(gamma(2, 0.1), class = "nu")
+          # prior(gamma(4, 1), class = "nu")
+        f <- bf(log(species_average_daily_view) ~
+          1 + celebrity +
+          (1 + celebrity | taxonomic_group) + (1 | serial_number), nu = .nu)
+```
+
+We constructed the Stan (REF) models with the package brms (REF).
+For each fitted model, we used brms and cmdstanr (REF) to sample 2000 iterations across 4 chains with 1000 iterations of warm-up per chain with the Stan No U-Turn Sampler.
+We assessed convergence visually with traceplots and assuring that ESS (effect of sample size) was $>$ 100 and Rhat (the scale reduction factor) was < 1.01 for all parameters.
+We assessed the ability for our probabilistic models to generate our observed data via density plots of posterior predictive checks.
+
+# Supplementary results
+
+Overall, the NB2 and Student-t models provided similar inference.
+However, based on slightly better posterior predictive checks, generally smaller effect sizes, and consistency with the preregistered study design we moved forward with the Student-t model.
+
+# Supplementary figures
+
+```{r dot-line-nb2, fig.cap="Effects NB2. 50\\% and 95\\% credible intervals", out.width="4in"}
+f <- here("figs/dot-line-1-1000-nb2.png")
+include_graphics(f)
+```
+
+```{r dot-line-st4, fig.cap="Effects Student-t. 50\\% and 95\\% credible intervals", out.width="4in"}
+f <- here("figs/dot-line-1-1000-st4.png")
+include_graphics(f)
+```
+
+```{r ppc-nb2, fig.cap="Posterior predictive check of the NB2 model.", out.width="6in"}
+f <- here("figs/nb2-ppcheck.png")
+include_graphics(f)
+```
+
+```{r ppc-st4, fig.cap="Posterior predictive check of the Student-t model. Black line represents the density of the observed data. Blue lines represent the density of 50 random draws from the posterior predictive distribution. The panels represent the four threshold for defining a celebrity. We have cut off the x-axes to focus on the center of the distribution. At lower thresholds (1 and 10) we see that the observed data have heavier tails than the predictive data. This becomes much less apparent at thresholds of 100 or 1000.", out.width="6in"}
+f <- here("figs/st4-ppcheck.png")
+include_graphics(f)
+```
+
+```{r nb2-prob-table}
+linesep <-  c('', '', '', '', '', '\\addlinespace')
+tb <- readRDS(here("data-generated/nb2-probs.rds"))
+knitr::kable(tb, digits = 2L, booktabs = TRUE, linesep = linesep,
+  caption = "NB2 posterior"
+  )
+```
+
+```{r st4-prob-table}
+tb <- readRDS(here("data-generated/nb2-probs.rds"))
+knitr::kable(tb, digits = 2L, booktabs = TRUE, linesep = linesep, 
+  caption = "Student-t posterior")
+```
+
+```{r violin-zoom, fig.cap="Visualization of raw data. The y-axis shows the ratio of average daily views for celebrity vs. non-celebrity species. The x-axis shows the average celebrity species page views. The red lines are robust linear regression for visualization purposes. We do not observe any strong patterns.", out.width="6in", eval=FALSE}
+f <- here("figs/raw-dat-rlm.png")
+include_graphics(f)
+```
+
+```{r raw-rlm, fig.cap="The distribution of the ratio of average celebrity vs. non-celebrity species views across the four thresholds of defining a celebrity. The horizontal line is the median and the red outline is a violin (density) plot. The y-axes are truncated to focus on the center of the distribution.", out.width="6in"}
+f <- here("figs/raw-dat-violin.png")
+include_graphics(f)
+```

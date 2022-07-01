@@ -47,6 +47,75 @@ ggplot(d, aes(as.factor(celebrity), log10(species_average_daily_view + 1))) +
   geom_violin() +
   facet_wrap(vars(taxonomic_group), scales = "free_y")
 
+group_by(d, taxonomic_group, serial_number) %>%
+  summarise(.diff = species_average_daily_view[celebrity == 1] / species_average_daily_view[celebrity == 0]) %>%
+  ggplot(aes(taxonomic_group, log10(.diff))) +
+  geom_boxplot()
+
+group_by(d, taxonomic_group, serial_number) %>%
+  filter(celeb_average_daily_view > 100) %>%
+  summarise(.diff = species_average_daily_view[celebrity == 1] / species_average_daily_view[celebrity == 0]) %>%
+  ggplot(aes(taxonomic_group, log10(.diff))) +
+  geom_boxplot()
+
+
+# group_by(d, taxonomic_group, serial_number) %>%
+#   filter(celeb_average_daily_view > 1000) %>%
+#   filter(species_average_daily_view > 0) %>%
+#   summarise(.diff = species_average_daily_view[celebrity == 1] / species_average_daily_view[celebrity == 0], celeb_views = mean(celeb_average_daily_view, na.rm = TRUE)) %>%
+#   ggplot(aes(celeb_views, .diff)) +
+#   geom_point() +
+#   facet_wrap(~taxonomic_group)
+
+library(MASS)
+group_by(d, taxonomic_group, serial_number) %>%
+  mutate(celeb_views = mean(celeb_average_daily_view, na.rm = TRUE)) %>%
+  filter(celeb_views >= 1) %>%
+  filter(species_average_daily_view > 0) %>%
+  summarise(.diff = species_average_daily_view[celebrity == 1] / species_average_daily_view[celebrity == 0], celeb_views = mean(celeb_views, na.rm = TRUE)) %>%
+  ggplot(aes(celeb_views, .diff)) +
+  geom_point(alpha = 0.3) +
+  scale_y_log10() +
+  scale_x_log10() +
+  facet_wrap(~taxonomic_group, scales = "fixed") +
+  ggsidekick::theme_sleek() +
+  geom_hline(yintercept = 1, lty = 2) +
+  geom_smooth(se = F, method = "rlm", colour = "red") +
+  ggtitle("Celeb >= 1") +
+  ylab("Ratio of average views\n(celebrity to non-celebrity species)") +
+  xlab("Celebrity average page views")
+
+xx <- group_by(d, taxonomic_group, serial_number) %>%
+  mutate(celeb_views = mean(celeb_average_daily_view, na.rm = TRUE)) %>%
+  filter(species_average_daily_view > 0) %>%
+  summarise(.diff = species_average_daily_view[celebrity == 1] / species_average_daily_view[celebrity == 0], celeb_views = mean(celeb_views, na.rm = TRUE)) %>% ungroup()
+xx$type <- "Celeb0001"
+
+zz <- purrr::map_dfr(c(1, 10, 100, 1000), function(.x) {
+  xx %>%
+    filter(celeb_views > .x) %>%
+    mutate(cutoff = .x)
+})
+
+
+zz %>%
+  ggplot(aes(as.factor(cutoff), .diff)) +
+  # geom_boxplot() +
+  geom_point(position = position_jitter(height = 0, width = 0.1), alpha = 0.1) +
+  geom_violin(draw_quantiles = c(0.5), alpha = 0.5, colour = "red") +
+  scale_y_log10() +
+  # scale_x_log10() +
+  coord_cartesian(ylim = c(0.2, 5)) +
+  ggsidekick::theme_sleek() +
+  geom_hline(yintercept = 1, lty = 2) +
+  ggtitle("Celeb > 100") +
+  ylab("Ratio of average views\n(celebrity to non-celebrity species)") +
+  xlab("") +
+  facet_wrap(~taxonomic_group, scales = "fixed")
+
+
+# facet_wrap(vars(taxonomic_group), scales = "free_y")
+
 ggplot(d, aes(as.factor(celebrity), log10(species_average_daily_view + 1))) +
   geom_boxplot() +
   facet_wrap(vars(taxonomic_group), scales = "free_y")
