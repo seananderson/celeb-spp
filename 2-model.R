@@ -140,8 +140,8 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
 #   theme(panel.grid = element_blank(),
 #     legend.position = "none")
 
-ITER <- 200L
-CHAINS <- 1L
+ITER <- 1000L
+CHAINS <- 4L
 
 fit1_nb <- fit_brms_mod(d,
   iter = ITER, model_disp = FALSE,
@@ -177,8 +177,6 @@ fit1_1000_nb <- fit_brms_mod(d_1000,
 #   chains = CHAINS, family = "NB2", independent_taxa = TRUE
 # )
 
-
-
 NU <- 4
 fit1_st_nu4 <- fit_brms_mod(dpos,
   iter = ITER, model_disp = FALSE,
@@ -203,26 +201,86 @@ fit1_1000_st_nu4 <- fit_brms_mod(dpos_1000,
 
 
 
-fit1_st_nu4_ind <- fit_brms_mod(dpos,
-  iter = ITER, model_disp = FALSE,
-  chains = CHAINS, independent_taxa = TRUE,
-  family = "Student", .nu = NU
-)
-fit1_10_st_nu4_ind <- fit_brms_mod(dpos_10,
-  iter = ITER, model_disp = FALSE,
-  chains = CHAINS,independent_taxa = TRUE,
-  family = "Student", .nu = NU
-)
-fit1_100_st_nu4_ind <- fit_brms_mod(dpos_100,
-  iter = ITER, model_disp = FALSE,
-  chains = CHAINS,independent_taxa = TRUE,
-  family = "Student", .nu = NU
-)
-fit1_1000_st_nu4_ind <- fit_brms_mod(dpos_1000,
-  iter = ITER, model_disp = FALSE,
-  chains = CHAINS,independent_taxa = TRUE,
-  family = "Student", .nu = NU
-)
+# fit1_st_nu4_ind <- fit_brms_mod(dpos,
+#   iter = ITER, model_disp = FALSE,
+#   chains = CHAINS, independent_taxa = TRUE,
+#   family = "Student", .nu = NU
+# )
+# fit1_10_st_nu4_ind <- fit_brms_mod(dpos_10,
+#   iter = ITER, model_disp = FALSE,
+#   chains = CHAINS,independent_taxa = TRUE,
+#   family = "Student", .nu = NU
+# )
+# fit1_100_st_nu4_ind <- fit_brms_mod(dpos_100,
+#   iter = ITER, model_disp = FALSE,
+#   chains = CHAINS,independent_taxa = TRUE,
+#   family = "Student", .nu = NU
+# )
+# fit1_1000_st_nu4_ind <- fit_brms_mod(dpos_1000,
+#   iter = ITER, model_disp = FALSE,
+#   chains = CHAINS,independent_taxa = TRUE,
+#   family = "Student", .nu = NU
+# )
+
+# glmmTMB basics??
+
+# library(glmmTMB)
+
+tax <- c("Amphibian", "Bird", "Fish", "Invertebrate", "Mammal", "Reptile")
+thresholds <- c(1, 10, 100, 1000)
+all <- expand.grid(tax = tax, thresholds = thresholds)
+
+fit_ml_models <- function(.x, .y, student = TRUE, df = 4) {
+  print(paste(.x, .y))
+  if (.y == 1) dat <- dpos
+  if (.y == 10) dat <- dpos_10
+  if (.y == 100) dat <- dpos_100
+  if (.y == 1000) dat <- dpos_1000
+
+  dd <- dplyr::filter(dat, taxonomic_group == .x)
+  dd$serial_number <- as.factor(dd$serial_number)
+  fam <- if (student) sdmTMB::student(df = df) else gaussian()
+  # if (.y == 10 && .x == "Mammal") browser()
+  m <- sdmTMB::sdmTMB(log(species_average_daily_view) ~
+      celebrity + (1 | serial_number),
+    data = dd, family = fam, spatial = "off", reml = TRUE,
+    silent = FALSE
+  )
+  cis <- sdmTMB::tidy(m, conf.int = TRUE)[2L,,drop=FALSE]
+  cis50 <- sdmTMB::tidy(m, conf.int = TRUE, conf.level = 0.5)[2L,c("conf.low", "conf.high"),drop=FALSE]
+  names(cis50) <- c("conf.low50", "conf.high50")
+  data.frame(cis, cis50, taxa = .x, threshold = .y)
+}
+
+# fits3 <- purrr::map2_dfr(all$tax, all$thresholds, function(.x, .y)
+#   fit_ml_models(.x, .y, TRUE, df = 3))
+
+fits <- purrr::map2_dfr(all$tax, all$thresholds, function(.x, .y)
+  fit_ml_models(.x, .y, TRUE, df = 4))
+
+# fits7 <- purrr::map2_dfr(all$tax, all$thresholds, function(.x, .y)
+#   fit_ml_models(.x, .y, TRUE, df = 7))
+
+fits
+
+fits %>% filter(!is.na(conf.low)) %>%
+  ggplot(aes(taxa, exp(estimate),
+  ymin = exp(conf.low), ymax = exp(conf.high),
+    colour = as.factor(threshold))) +
+  geom_hline(yintercept = 1, lty = 2) +
+  geom_pointrange(position = position_dodge(width = 0.5)) +
+  geom_linerange(aes(ymin = exp(conf.low50), ymax = exp(conf.high50)), lwd = 1,
+    position = position_dodge(width = 0.5)) +
+  coord_flip() +
+  xlab("") +
+  ylab("Multiplicative effect") +
+  theme_light() +
+  scale_y_log10() +
+  scale_colour_viridis_d(end = 0.9) +
+  scale_fill_viridis_d(end = 0.9) +
+  labs(colour = "Celebrity\nviews\nthreshold")
+
+ggsave("figs/independent-sdmTMB-models-student-4.png", width = 5, height = 5)
 
 # NU <- 5
 # fit1_st_nu5 <- fit_brms_mod(dpos,
@@ -256,6 +314,7 @@ fit1_1000_st_nu4_ind <- fit_brms_mod(dpos_1000,
 
 m_nb2 <- list(fit1_nb, fit1_10_nb, fit1_100_nb, fit1_1000_nb)
 m_st4 <- list(fit1_st_nu4, fit1_10_st_nu4, fit1_100_st_nu4, fit1_1000_st_nu4)
+# m_st4_ind <- list(fit1_st_nu4_ind, fit1_10_st_nu4_ind, fit1_100_st_nu4_ind, fit1_1000_st_nu4_ind)
 # m_st5 <- list(fit1_st_nu5, fit1_10_st_nu5, fit1_100_st_nu5, fit1_1000_st_nu5)
 
 names(m_nb2) <- paste0(c(1, 10, 100, 1000))
@@ -282,7 +341,7 @@ cowplot::plot_grid(plotlist = g)
 ggsave("figs/nb2-ppcheck.png", width = 10, height = 6)
 
 XLIM <- xlim(-10, 10)
-XLAB <- xlab("Ln average daily species views")
+XLAB <- xlab("ln average daily species views")
 g <- list()
 g[[1]] <- pp_check(fit1_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 1")
@@ -336,25 +395,28 @@ get_draws <- function(fit) {
     left_join(p2)
 }
 
-get_draws_ind <- function(fit) {
-  p <- tidybayes::spread_draws(fit, `b_.*`, regex = TRUE)
-  bird <-    p$`b_celebrity:taxonomic_groupBird`
-  invert <-  p$`b_celebrity:taxonomic_groupInvertebrate`
-  mammal <-  p$`b_celebrity:taxonomic_groupMammal`
-  reptile <- p$`b_celebrity:taxonomic_groupReptile`
-  fish <-    p$`b_celebrity:taxonomic_groupFish`
-  amphibian <- rep(0, nrow(p))
-  post <- bind_rows(
-    data.frame(taxa = "Bird", r_taxonomic_group = bird, stringsAsFactors = FALSE),
-    data.frame(taxa = "Invertebrate", r_taxonomic_group = invert, stringsAsFactors = FALSE),
-    data.frame(taxa = "Mammal", r_taxonomic_group = mammal, stringsAsFactors = FALSE),
-    data.frame(taxa = "Reptile", r_taxonomic_group = reptile, stringsAsFactors = FALSE),
-    data.frame(taxa = "Fish", r_taxonomic_group = fish, stringsAsFactors = FALSE),
-    data.frame(taxa = "Amphibian", r_taxonomic_group = amphibian, stringsAsFactors = FALSE),
-  )
-  post$b_celebrity <- rep(p$b_celebrity, 6L)
-  post
-}
+# get_draws_ind <- function(fit) {
+#   p <- tidybayes::spread_draws(fit, `b_.*`, regex = TRUE)
+#   bird <-    p$`b_celebrity:taxonomic_groupBird`
+#   invert <-  p$`b_celebrity:taxonomic_groupInvertebrate`
+#   mammal <-  p$`b_celebrity:taxonomic_groupMammal`
+#   reptile <- p$`b_celebrity:taxonomic_groupReptile`
+#   fish <-    p$`b_celebrity:taxonomic_groupFish`
+#   amphibian <- rep(0, nrow(p))
+#   post <- bind_rows(
+#     data.frame(taxa = "Bird", r_taxonomic_group = bird, stringsAsFactors = FALSE),
+#     data.frame(taxa = "Invertebrate", r_taxonomic_group = invert, stringsAsFactors = FALSE),
+#     data.frame(taxa = "Mammal", r_taxonomic_group = mammal, stringsAsFactors = FALSE),
+#     data.frame(taxa = "Reptile", r_taxonomic_group = reptile, stringsAsFactors = FALSE),
+#     data.frame(taxa = "Fish", r_taxonomic_group = fish, stringsAsFactors = FALSE),
+#     data.frame(taxa = "Amphibian", r_taxonomic_group = amphibian, stringsAsFactors = FALSE),
+#   )
+#   post$b_celebrity <- rep(p$b_celebrity, 6L)
+#   post
+# }
+
+# dd <- get_draws_ind(fit1_100_st_nu4_ind)
+
 
 # tidybayes::get_variables(fit1_10_nb_ind)
 
@@ -371,9 +433,9 @@ plot_violins <- function(draws_df) {
 post2 <- readRDS("data-generated/nb2-models.rds")
 draws <- get_draws(post2[[2]])
 plot_violins(draws)
-get_draws_ind(fit1_10_nb_ind) %>% plot_violins()
+# get_draws_ind(fit1_10_nb_ind) %>% plot_violins()
 
-pred <- brms::posterior_predict(fit1_10_nb_ind, ndraws = 1)
+# pred <- brms::posterior_predict(fit1_10_nb_ind, ndraws = 1)
 
 library(DHARMa)
 post2 <- readRDS("data-generated/st4-models.rds")
@@ -464,7 +526,7 @@ dot_line_plot <- function(post) {
       position = position_dodge(width = 0.5)) +
     coord_flip() +
     xlab("") +
-    ylab("Multiplictive effect") +
+    ylab("Multiplicative effect") +
     theme_light() +
     scale_y_log10() +
     scale_colour_viridis_d(end = 0.9) +
@@ -483,6 +545,11 @@ pp <- purrr::map_dfr(m_st4, function(.x) {
 }, .id = "celeb")
 dot_line_plot(pp)
 ggsave("figs/dot-line-1-1000-st4.png", width = 5, height = 5)
+
+# pp <- purrr::map_dfr(m_st4_ind, function(.x) {
+#   get_draws_ind(.x)
+# }, .id = "celeb")
+# dot_line_plot(pp)
 
 # get_draws(fit1_nb) %>% plot_violins()
 # get_draws(fit1_10_nb) %>% plot_violins()
