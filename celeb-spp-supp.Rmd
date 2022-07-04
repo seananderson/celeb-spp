@@ -1,5 +1,5 @@
 ---
-title: "Species with celebrity names"
+title: "Supporting Information: Do species named after celebrities receive more attention on Wikipedia?"
 author: ""
 output:
     bookdown::pdf_document2:
@@ -61,7 +61,7 @@ These GLMMs were constructed with random intercepts to account for the paired na
 Our preregistered study design [@preregistration2022] defined a celebrity-related species as having at least one view on average per day.
 When inspecting model fit we noted better model fit (fewer outliers that our models could not account for as assessed with posterior predictive simulation draws) with higher thresholds of defining a celebrity.
 We also reconsidered whether one was a sufficient number of average daily Wikipedia views to define a celebrity.
-There, we considered four thresholds for defining a celebrity species: 1, 10, 100, or 1000 average daily views.
+Therefor, we considered four thresholds for defining a celebrity species: 1, 10, 100, or 1000 average daily views.
 The number of species pairs that qualified under these definitions were: `r n1`, `r n10`, `r n100`, and `r n1000` for the four thresholds.
 The number of species pairs can also be broken down by taxa (Tables \@ref(tab:nt-d), \@ref(tab:nt-dpos)).
 
@@ -135,7 +135,7 @@ In this case, each model took the form:
 \end{align}
 where $\alpha$ and $\beta$ are unique to each taxa.
 This version retained the random intercept for $\delta_s$ to account for the paired nature of the data.
-We fit these models with the R package sdmTMB [@anderson2022], which uses Template Model Builder to construct the log likelihood function and integrate over the random effects with the Laplace approximation [@kristensen2016].
+We fit these models with the R package sdmTMB [@anderson2022], which uses Template Model Builder (TMB) to construct the log likelihood function and to integrate over the random effects with the Laplace approximation [@kristensen2016].
 
 # Supplementary results
 
