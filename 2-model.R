@@ -176,6 +176,51 @@ dir.create("data-generated", showWarnings = FALSE)
 saveRDS(m_nb2, file = "data-generated/nb2-models.rds")
 saveRDS(m_st4, file = "data-generated/st4-models.rds")
 
+m_nb2 <- readRDS("data-generated/nb2-models.rds")
+m_st4 <- readRDS("data-generated/st4-models.rds")
+
+col_lab <- "Celebrity\nviews\nthreshold"
+
+# global coef plots ------------------------
+
+p <- lapply(m_st4, brms::as_draws_df)
+p2 <- purrr::map_dfr(p, function(.x) {
+  data.frame(b_celebrity = .x$b_celebrity)
+}, .id = "threshold")
+ggplot(p2, aes(exp(b_celebrity), colour = threshold, fill = threshold)) +
+  geom_vline(xintercept = 1, lty = 2, colour = "grey30") +
+  geom_density(alpha = 0.1, colour = NA) +
+  geom_density(fill = NA) +
+  coord_cartesian(xlim = c(0.8, 2.5)) +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_light() +
+  scale_y_continuous(expand = expansion(mult = c(0, .02))) +
+  labs(colour = col_lab, fill = col_lab, y = "Density", x = "Multiplicative celebrity effect\nacross taxonomic groups")
+ggsave("figs/global-effect-st4.png", width = 7, height = 4)
+
+saveRDS(p2, "data-generated/global-posterior-st4.rds")
+
+p <- lapply(m_nb2, brms::as_draws_df)
+p2 <- purrr::map_dfr(p, function(.x) {
+  data.frame(b_celebrity = .x$b_celebrity)
+}, .id = "threshold")
+ggplot(p2, aes(exp(b_celebrity), colour = threshold, fill = threshold)) +
+  geom_vline(xintercept = 1, lty = 2, colour = "grey30") +
+  geom_density(alpha = 0.1, colour = NA) +
+  geom_density(fill = NA) +
+  coord_cartesian(xlim = c(0.8, 2.5)) +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_light() +
+  scale_y_continuous(expand = expansion(mult = c(0, .02))) +
+  labs(colour = col_lab, fill = col_lab, y = "Density", x = "Multiplicative celebrity effect\nacross taxonomic groups")
+ggsave("figs/global-effect-nb2.png", width = 7, height = 4)
+
+saveRDS(p2, "data-generated/global-posterior-nb2.rds")
+
+# posterior predictive plots ------------------
+
 bayesplot::bayesplot_theme_set(theme_light())
 g <- list()
 XLAB <- xlab("Species page views")

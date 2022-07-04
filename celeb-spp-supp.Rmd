@@ -139,7 +139,7 @@ We fit these models with the R package sdmTMB [@anderson2022], which uses Templa
 
 # Supplementary results
 
-Overall, the Student-t and NB2 models provided similar inference (Fig.\ \@ref(fig:dot-line-st4) vs.\ \@ref(fig:dot-line-nb2)).
+Overall, the Student-t and NB2 models provided similar inference (Fig.\ \@ref(fig:global-st4) vs.\ \@ref(fig:global-nb2) and Fig.\ \@ref(fig:dot-line-st4) vs.\ \@ref(fig:dot-line-nb2), Table \@ref(tab:global)).
 However, based on slightly better posterior predictive checks (Fig.\ \@ref(fig:ppc-st4), \@ref(fig:ppc-nb2)), generally smaller (more conservative) effect sizes (Fig.\ \@ref(fig:dot-line-st4), \@ref(fig:dot-line-nb2)), and consistency with the preregistered study design [@preregistration2022] we moved forward with the Student-t model.
 
 Fitting separate models for each taxonomic group (Fig.\ \@ref(fig:dot-line-st4) vs.\ \@ref(fig:dot-line-st4-ind)) and fitting the models with maximum likelihood and no priors resulted in broadly the same inference with some exceptions. The magnitude of the largest effects (invertebrates) were slightly more constrained (smaller) in the hierarchical model, as we would expect in a hierarchical model with priors. The effects for 100 and 1000 celebrity thresholds for reptiles and amphibians were closer to zero in the independent model, likely due to the hierarchical model pulling these effects towards the mean.
@@ -159,6 +159,16 @@ x <- x / 365.25
 x <- x[is.finite(x)]
 x <- x[!is.na(x)]
 hist(x, breaks = 100, main = "", xlab = "Implied number of years")
+```
+
+```{r global-st4, fig.cap="Overall (across taxonomic groups) multiplicative effect on average daily Wikipedia views of a species being named after a celebrity compared to a similar species not named after a celebrity. This version uses a heavy-tailed Student-t observation error. Shown is the posterior density of the estimated parameter. Colours represent definitions of a celebrity at increasing thresholds for average daily view counts. For example, the 100 threshold only includes species pairs where the celebrity Wikipedia page had at least 100 average daily views.", out.width="4in"}
+f <- here("figs/global-effect-st4.png")
+include_graphics(f)
+```
+
+```{r global-nb2, fig.cap="Same as previous figure but with negative binomial observation error.", out.width="4in"}
+f <- here("figs/global-effect-nb2.png")
+include_graphics(f)
 ```
 
 ```{r dot-line-st4, fig.cap="Multiplicative effect on average daily Wikipedia views of a species being named after a celebrity compared to a similar species not named after a celebrity. This version uses a heavy-tailed Student-t observation error. Dots represent medians and thick and thin lines represent 50\\% and 95\\% credible intervals of the posterior. Colour lines represent definitions of a celebrity at increasing thresholds for average daily view counts. For example, the 100 threshold only includes species pairs where the celebrity Wikipedia page had at least 100 average daily views.", out.width="4in"}
@@ -236,6 +246,19 @@ tb <- readRDS(here("data-generated/nb2-probs.rds"))
 knitr::kable(tb, digits = 2L, booktabs = TRUE, linesep = linesep,
   caption = "NB2 posterior"
   )
+```
+
+```{r global}
+p2 <- readRDS(here::here("data-generated/global-posterior-st4.rds"))
+st4 <- group_by(p2, threshold) %>%
+  summarize(prob_st4 = mean(b_celebrity > 0))
+p2 <- readRDS(here::here("data-generated/global-posterior-nb2.rds"))
+nb2 <- group_by(p2, threshold) %>%
+  summarize(prob_nb2 = mean(b_celebrity > 0))
+
+left_join(st4, nb2) %>% 
+  knitr::kable(digits = 2L, booktabs = TRUE, linesep = '',
+    col.names = c("Celebrity threshold", "Prob. effect > 1 (Student-t)", "Prob. effect > 1 (NB2)"), caption = "Posterior probability for the overall multiplicative effect that is above 1. In other words, the probability of a positive effect on species page views for celebrity vs. non-celebrity-named species across taxonomic groups.")
 ```
 
 ```{r st4-prob-table}
