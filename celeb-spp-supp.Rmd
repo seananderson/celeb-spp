@@ -2,12 +2,22 @@
 title: "Species with celebrity names"
 author: ""
 output:
-  # bookdown::word_document2:
-  bookdown::pdf_document2:
-  toc: false
+    bookdown::pdf_document2:
+      toc: false
+      number_sections: false
+      fig_caption: true
 number_sections: false
 fig_caption: true
 highlight: "monochrome"
+bibliography: refs.bib
+csl: mee.csl
+link-citations: yes
+header-includes:
+  \widowpenalty10000
+  \clubpenalty10000
+  \renewcommand{\theequation}{S.\arabic{equation}}
+  \renewcommand{\thetable}{S\arabic{table}}
+  \renewcommand{\thefigure}{S\arabic{figure}}
 ---
 
 ```{r setup, include=FALSE}
@@ -22,24 +32,52 @@ knitr::opts_chunk$set(
 )
 library(knitr)
 library(here)
+library(dplyr)
 ```
+
+```{r dat}
+source("1-prep-data.R")
+loss1 <- length(unique(d$serial_number)) - length(unique(dpos$serial_number))
+loss10 <- length(unique(d_10$serial_number)) - length(unique(dpos_10$serial_number))
+loss100 <- length(unique(d_100$serial_number)) - length(unique(dpos_100$serial_number))
+loss1000 <- length(unique(d_1000$serial_number)) - length(unique(dpos_1000$serial_number))
+
+p1 <- round((loss1 / length(unique(d$serial_number))) * 100, 1)
+p10 <- round((loss10 / length(unique(d_10$serial_number))) * 100, 1)
+p100 <- round((loss100 / length(unique(d_100$serial_number))) * 100, 1)
+p1000 <- round((loss1000 / length(unique(d_1000$serial_number))) * 100, 1)
+
+n1 <- length(unique(d$serial_number))
+n10 <- length(unique(d_10$serial_number))
+n100 <- length(unique(d_100$serial_number))
+n1000 <- length(unique(d_1000$serial_number))
+```
+
 
 # Supplementary methods
 
 We fit Bayesian hierarchical generalized linear mix effects models (GLMMs) to assess the effect of species being named after celebrities on Wikipedia view counts.
-These GLMMs were constructed with random intercepts to account for the paired nature of species matched based on TODO.
+These GLMMs were constructed with random intercepts to account for the paired nature of celebrity and non-celebrity species.
+Our preregistered study design [@preregistration2022] defined a celebrity-related species as having at least one view on average per day.
+When inspecting model fit we noted better model fit (fewer outliers that our models could not account for as assessed with posterior predictive simulation draws) with higher thresholds of defining a celebrity.
+We also reconsidered whether one was a sufficient number of average daily Wikipedia views to define a celebrity.
+There, we considered four thresholds for defining a celebrity species: 1, 10, 100, or 1000 average daily views.
+The number of species pairs that qualified under these definitions were: `r n1`, `r n10`, `r n100`, and `r n1000` for the four thresholds.
+The number of species pairs can also be broken down by taxa (Tables \@ref(tab:nt-d), \@ref(tab:nt-dpos)).
 
 We considered two forms of observation error:
 (1) Student-t observation error on the (natural) log of average species daily views on Wikipedia, and
-(2) negative binomial ('NB2' [REF]) observation error on total number of species views.
+(2) negative binomial ['NB2', @hilbe2011] observation error on total number of species views.
 
-The first option models a continuous value (log of average species daily views) with a heavy-tailed observation error distribution.
-This option is also closest to the preregistered methodological approach.
+**Student-t**: The first option models a continuous value (log of average species daily views) with a heavy-tailed observation error distribution.
+This option matches the preregistered methodological approach [@preregistration2022].
 We were unable to use a simple Gaussian error distribution as noted in the preregistration because of the heavy-tailed nature of the observations (the confidence intervals would have been overly precise and the parameters biased by rare outlying values).
-The Student-t model necessitated excluding (TODO) species pairs where one or the other had zero views.
+The Student-t model necessitated excluding `r loss1`, `r loss10`, `r loss100`, or `r loss1000` species pairs from the datasets defining a celebrity as $>$ 1, 10, 100, or 1000 average daily page views, where the non-celebrity species had an average (rounded) value of zero page views.
+This corresponded to `r p1`\%, `r p10`\%, `r p100`\%, or `r p1000`\% of the species pairs for the four thresholds.
 
-The second option is a count distribution where the observation variance grows quadratically with the expected value.
+**Negative binomial**: The second option (NB2) is a count distribution where the observation variance grows quadratically with the expected value.
 This maintains the integer nature of the data generating process and allows for zeros but may not sufficiently account for outliers.
+Furthermore, it assumes the total Wikipedia views for each species was measured over the same time (six years), which was usually but not always the case (Fig.\ \@ref(fig:implied-years)).
 
 Starting with the Student-t model, our model was of the form:
 \begin{align}
@@ -73,23 +111,22 @@ We placed the following weakly informative priors on the estimated parameters:
 \tau_{\delta} &\sim \mathrm{Student-t \left(3, 0, 2.5 \right)}.
 \end{align}
 
-We placed an $\mathrm{LKJ}(1)$ prior on the correlation between $\beta_{j}$ and $\alpha_{j}$ as is the default in the package brms (REF).
+We placed an $\mathrm{LKJ}(1)$ prior on the correlation between $\beta_{j}$ and $\alpha_{j}$ as is the default in the package brms [@brms2017].
 
 The negative binomial model was the same except for the main equations:
 \begin{align}
-y_i &\sim \mathrm{NB2} \left( \mu_i, \phi \right),\\
+z_i &\sim \mathrm{NB2} \left( \mu_i, \phi \right),\\
 \log (\mu_i) &\sim \alpha + \alpha_j + \delta_s + \beta C_i + \beta_j C_i,
 \end{align}
-where $y_i$ represents counts of page views.
+where $z_i$ represents counts of page views.
 We placed a $\mathrm{Student-t} \left(3, 0, 5 \right)$ prior on the shape parameter $\phi$.
 
-We constructed the Stan (REF) models with the package brms (REF).
-For each fitted model, we used brms and cmdstanr (REF) to sample 2000 iterations across 4 chains with 1000 iterations of warm-up per chain with the Stan No U-Turn Sampler.
+We constructed Stan [@carpenter2017] models with the R package brms [@brms2017].
+For each fitted model, we used brms and cmdstanr [@cmdstanr2022] to sample 2000 iterations across 4 chains with 1000 iterations of warm-up per chain with the Stan No U-Turn Sampler.
 We assessed convergence visually with traceplots and assuring that ESS (effect of sample size) was $>$ 100 and Rhat (the scale reduction factor) was < 1.01 for all parameters.
-We assessed the ability for our probabilistic models to generate our observed data via density plots of posterior predictive checks.
+We assessed the ability for our probabilistic models to generate our observed data via density plots of posterior predictive checks [@gelman2014].
 
-To assess the degree to which the taxa with the most data were affecting inference for the data with fewer data (due to the hierarchical structure) and as a check that our Bayesian model with priors was not unduly influencing our inference,
-we fit alternative versions of the Student-t model where each taxon was fit independently with (restricted) maximum likelihood and without priors.
+To assess the degree to which the taxonomic groups with the most data were affecting inference for the data with fewer data (due to the hierarchical structure), and as a check that our Bayesian model with priors was not unduly influencing our inference, we fit alternative versions of the Student-t model where each taxon was fit independently with (restricted) maximum likelihood and without priors.
 In this case, each model took the form:
 \begin{align}
 \log(y_i) &\sim \mathrm{Student-t} \left( \nu, \mu_i, \sigma \right),\\
@@ -97,14 +134,32 @@ In this case, each model took the form:
 \delta_{s} &\sim \mathrm{Normal} \left(0, \tau_{\delta}^2 \right),
 \end{align}
 where $\alpha$ and $\beta$ are unique to each taxa.
-This version retained the random intercept for $\delta_i$ to account for the paired nature of the data.
+This version retained the random intercept for $\delta_s$ to account for the paired nature of the data.
+We fit these models with the R package sdmTMB [@anderson2022], which uses Template Model Builder to construct the log likelihood function and integrate over the random effects with the Laplace approximation [@kristensen2016].
 
 # Supplementary results
 
-Overall, the NB2 and Student-t models provided similar inference.
-However, based on slightly better posterior predictive checks, generally smaller effect sizes, and consistency with the preregistered study design we moved forward with the Student-t model.
+Overall, the Student-t and NB2 models provided similar inference (Fig.\ \@ref(fig:dot-line-st4) vs.\ \@ref(fig:dot-line-nb2)).
+However, based on slightly better posterior predictive checks (Fig.\ \@ref(fig:ppc-st4), \@ref(fig:ppc-nb2)), generally smaller (more conservative) effect sizes (Fig.\ \@ref(fig:dot-line-st4), \@ref(fig:dot-line-nb2)), and consistency with the preregistered study design [@preregistration2022] we moved forward with the Student-t model.
+
+Fitting separate models for each taxonomic group (Fig.\ \@ref(fig:dot-line-st4) vs.\ \@ref(fig:dot-line-st4-ind)) and fitting the models with maximum likelihood and no priors resulted in broadly the same inference with some exceptions. The magnitude of the largest effects (invertebrates) were slightly more constrained (smaller) in the hierarchical model, as we would expect in a hierarchical model with priors. The effects for 100 and 1000 celebrity thresholds for reptiles and amphibians were closer to zero in the independent model, likely due to the hierarchical model pulling these effects towards the mean.
+
+Visualizing the distribution of the raw data (Fig.\ \@ref(fig:violin-zoom)) verified the main conclusions of the modelling.
+The largest difference in central tendency was for invertebrates, and the precision of the effect estimate is partly driven by having the largest sample size.
+The differences tended to be positive (more view for species named after celebrities) and to be slightly stronger at higher thresholds for defining a celebrity.
+We did not see a consistent pattern (more views for species named after celebrities) across reptiles or fish at higher thresholds for defining a celebrity.
+
+\clearpage
 
 # Supplementary figures
+
+```{r implied-years, fig.cap="Distribution of implied number of years. We calculated this by dividing the total Wikipedia species views by average daily views and dividing this by 365.25 (average days per year).", fig.width=7}
+x <- d$species_total_views / d$species_average_daily_view
+x <- x / 365.25
+x <- x[is.finite(x)]
+x <- x[!is.na(x)]
+hist(x, breaks = 100, main = "", xlab = "Implied number of years")
+```
 
 ```{r dot-line-st4, fig.cap="Multiplicative effect on average daily Wikipedia views of a species being named after a celebrity compared to a similar species not named after a celebrity. This version uses a heavy-tailed Student-t observation error. Dots represent medians and thick and thin lines represent 50\\% and 95\\% credible intervals of the posterior. Colour lines represent definitions of a celebrity at increasing thresholds for average daily view counts. For example, the 100 threshold only includes species pairs where the celebrity Wikipedia page had at least 100 average daily views.", out.width="4in"}
 f <- here("figs/dot-line-1-1000-st4.png")
@@ -121,7 +176,7 @@ f <- here("figs/independent-sdmTMB-models-student-4.png")
 include_graphics(f)
 ```
 
-```{r ppc-st4, fig.cap="Posterior predictive check of the Student-t model. Black line represents the density of the observed data. Blue lines represent the density of 25 random draws from the posterior predictive distribution. The panels represent the four threshold for defining a celebrity. We have cut off the x-axes to focus on the center of the distribution. At lower thresholds (1 and 10) we see that the observed data have heavier tails than the predictive data. This becomes much less apparent at thresholds of 100 or 1000.", out.width="6in"}
+```{r ppc-st4, fig.cap="Posterior predictive check of the Student-t models. Black line represents the density of the observed data. Blue lines represent the density of 25 random draws from the posterior predictive distribution. The panels represent the four threshold for defining a celebrity. We have cut off the x-axes to focus on the center of the distribution. At lower thresholds (1 and 10) we see that the observed data have heavier tails than the predictive data. This becomes much less apparent at thresholds of 100 or 1000.", out.width="6in"}
 f <- here("figs/st4-ppcheck.png")
 include_graphics(f)
 ```
@@ -131,17 +186,49 @@ f <- here("figs/nb2-ppcheck.png")
 include_graphics(f)
 ```
 
-```{r violin-zoom, fig.cap="Visualization of raw data. The y-axis shows the ratio of average daily views for celebrity vs. non-celebrity species. The x-axis shows the average celebrity species page views. The red lines are robust linear regression for visualization purposes. We do not observe any strong patterns.", out.width="6in", eval=FALSE}
+```{r raw-rlm, fig.cap="Visualization of raw data. The y-axis shows the ratio of average daily views for celebrity vs. non-celebrity species. The x-axis shows the average celebrity species page views. The red lines are robust linear regression for visualization purposes. We do not observe any strong patterns.", out.width="6in", eval=FALSE}
 f <- here("figs/raw-dat-rlm.png")
 include_graphics(f)
 ```
 
-```{r raw-rlm, fig.cap="A visualization of the raw data distribution. Shown is the distribution of the ratio of average celebrity vs. non-celebrity species views across the four thresholds of defining a celebrity. The horizontal line is the median and the red outline is a violin (density) plot. The y-axes are truncated to focus on the center of the distribution.", out.width="6in"}
+```{r violin-zoom, fig.cap="Visualization of the raw data distribution. Shown is the distribution of the ratio of average celebrity vs. non-celebrity species views across the four thresholds of defining a celebrity. The horizontal line is the median and the red outline is a violin (density) plot. The y-axes are truncated to focus on the center of the distribution.", out.width="6in"}
 f <- here("figs/raw-dat-violin.png")
 include_graphics(f)
 ```
 
 \clearpage
+
+```{r nt-d, message=FALSE}
+nt1<- group_by(d, taxonomic_group) %>%
+  summarize(n1 = length(unique(serial_number)))
+nt10<- group_by(d_10, taxonomic_group) %>%
+  summarize(n10 = length(unique(serial_number)))
+nt100<- group_by(d_100, taxonomic_group) %>%
+  summarize(n100 = length(unique(serial_number)))
+nt1000<- group_by(d_1000, taxonomic_group) %>%
+  summarize(n1000 = length(unique(serial_number)))
+
+left_join(nt1, nt10) %>%
+  left_join(nt100) %>%
+  left_join(nt1000) %>%
+  knitr::kable(digits = 0L, booktabs = TRUE, linesep = '', col.names = c("Taxonomic group", "1", "10", "100", "1000"), caption = "Number of species pairs in the full dataset (used with the NB2 models of total page views) at four definitions of celebrity status (threshold of minimum average daily Wikipedia views to be considered a celebrity).")
+```
+
+```{r nt-dpos, message=FALSE}
+nt1<- group_by(dpos, taxonomic_group) %>%
+  summarize(n1 = length(unique(serial_number)))
+nt10<- group_by(dpos_10, taxonomic_group) %>%
+  summarize(n10 = length(unique(serial_number)))
+nt100<- group_by(dpos_100, taxonomic_group) %>%
+  summarize(n100 = length(unique(serial_number)))
+nt1000<- group_by(dpos_1000, taxonomic_group) %>%
+  summarize(n1000 = length(unique(serial_number)))
+
+left_join(nt1, nt10) %>%
+  left_join(nt100) %>%
+  left_join(nt1000) %>%
+  knitr::kable(digits = 0L, booktabs = TRUE, linesep = '', col.names = c("Taxonomic group", "1", "10", "100", "1000"), caption = "Number of species pairs in the positive-only dataset (used with the Student-t models of log average daily views) at four definitions of celebrity status (threshold of minimum average daily Wikipedia views to be considered a celebrity).")
+```
 
 ```{r nb2-prob-table, eval=FALSE}
 linesep <-  c('', '', '', '', '', '\\addlinespace')
@@ -157,3 +244,7 @@ tb <- readRDS(here("data-generated/nb2-probs.rds"))
 knitr::kable(tb, digits = 2L, booktabs = TRUE, linesep = linesep,
   caption = "Posterior summary statistics for the hierarchical Student-t model. `CI' = credible interval. `Prob. effect > 1' is the posterior probability density above one. I.e., the probability of a positive effect of a species being named after a celebrity on a species' average daily Wikipedia views.", col.names = c("Celeb. threshold", "Taxon", "Prob. effect > 1", "Lower 95% CI", "Median", "Upper 95% CI"))
 ```
+
+\clearpage
+
+# References

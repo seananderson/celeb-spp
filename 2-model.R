@@ -140,7 +140,7 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
 #   theme(panel.grid = element_blank(),
 #     legend.position = "none")
 
-ITER <- 1000L
+ITER <- 2000L
 CHAINS <- 4L
 
 fit1_nb <- fit_brms_mod(d,
