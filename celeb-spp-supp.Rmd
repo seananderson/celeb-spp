@@ -2,7 +2,7 @@
 title: "Supporting Information: Do species named after celebrities receive more attention on Wikipedia?"
 author: ""
 output:
-    bookdown::pdf_document2:
+    bookdown::word_document2:
       toc: false
       number_sections: false
       fig_caption: true
@@ -56,7 +56,7 @@ n1000 <- length(unique(d_1000$serial_number))
 
 # Supplementary methods
 
-We fit Bayesian hierarchical generalized linear mix effects models (GLMMs) to assess the effect of species being named after celebrities on Wikipedia view counts.
+We fit Bayesian hierarchical generalized linear mixed effects models (GLMMs) to assess the effect of species being named after celebrities on Wikipedia view counts.
 These GLMMs were constructed with random intercepts to account for the paired nature of celebrity and non-celebrity species.
 Our preregistered study design [@preregistration2022] defined a celebrity-related species as having at least one view on average per day.
 When inspecting model fit we noted better model fit (fewer outliers that our models could not account for as assessed with posterior predictive simulation draws) with higher thresholds of defining a celebrity.
@@ -240,11 +240,14 @@ left_join(nt1, nt10) %>%
   knitr::kable(digits = 0L, booktabs = TRUE, linesep = '', col.names = c("Taxonomic group", "1", "10", "100", "1000"), caption = "Number of species pairs in the positive-only dataset (used with the Student-t models of log average daily views) at four definitions of celebrity status (threshold of minimum average daily Wikipedia views to be considered a celebrity).")
 ```
 
-```{r nb2-prob-table, eval=FALSE}
+```{r st4-prob-table, eval=TRUE}
 linesep <-  c('', '', '', '', '', '\\addlinespace')
-tb <- readRDS(here("data-generated/nb2-probs.rds"))
+# tb <- readRDS(here("data-generated/nb2-probs.rds"))
+tb <- readRDS(here("data-generated/st4-probs.rds"))
 knitr::kable(tb, digits = 2L, booktabs = TRUE, linesep = linesep,
-  caption = "NB2 posterior"
+  # caption = "NB2 posterior"
+  caption = "Student-t posterior",
+  col.names = c("Celeb. threshold", "Taxon", "Prob. effect > 1", "Lower 95% CI", "Median", "Upper 95% CI")
   )
 ```
 
@@ -261,11 +264,36 @@ left_join(st4, nb2) %>%
     col.names = c("Celebrity threshold", "Prob. effect > 1 (Student-t)", "Prob. effect > 1 (NB2)"), caption = "Posterior probability for the overall multiplicative effect that is above 1. In other words, the probability of a positive effect on species page views for celebrity vs. non-celebrity-named species across taxonomic groups.")
 ```
 
-```{r st4-prob-table}
+```{r tab99} 
+p2 <- readRDS(here::here("data-generated/global-posterior-st4.rds"))
+group_by(p2, threshold) |>
+  mutate(theta = exp(b_celebrity)) |>
+  summarise(
+    prob_gt_one = mean(theta > 1),
+    CI95_lwr = quantile(theta, 0.025), median = quantile(theta, 0.5),
+    CI95_upr = quantile(theta, 0.975)
+  ) |> 
+  knitr::kable(digits = 2L, booktabs = TRUE, linesep = '', col.names = c("Celeb. threshold", "Prob. effect > 1", "Lower 95% CI", "Median", "Upper 95% CI"), caption = "Student-t")
+```
+
+```{r tab99-nb2}
+p2 <- readRDS(here::here("data-generated/global-posterior-nb2.rds"))
+group_by(p2, threshold) |>
+  mutate(theta = exp(b_celebrity)) |>
+  summarise(
+    prob_gt_one = mean(theta > 1),
+    CI95_lwr = quantile(theta, 0.025), median = quantile(theta, 0.5),
+    CI95_upr = quantile(theta, 0.975)
+  ) |> 
+  knitr::kable(digits = 2L, booktabs = TRUE, linesep = '', col.names = c("Celeb. threshold", "Prob. effect > 1", "Lower 95% CI", "Median", "Upper 95% CI"), caption = "NB2")
+```
+
+
+```{r NB2-prob-table}
 linesep <-  c('', '', '', '', '', '\\addlinespace')
 tb <- readRDS(here("data-generated/nb2-probs.rds"))
 knitr::kable(tb, digits = 2L, booktabs = TRUE, linesep = linesep,
-  caption = "Posterior summary statistics for the hierarchical Student-t model. `CI' = credible interval. `Prob. effect > 1' is the posterior probability density above one. I.e., the probability of a positive effect of a species being named after a celebrity on a species' average daily Wikipedia views.", col.names = c("Celeb. threshold", "Taxon", "Prob. effect > 1", "Lower 95% CI", "Median", "Upper 95% CI"))
+  caption = "Posterior summary statistics for the hierarchical NB2 model. `CI' = credible interval. `Prob. effect > 1' is the posterior probability density above one. I.e., the probability of a positive effect of a species being named after a celebrity on a species' average daily Wikipedia views.", col.names = c("Celeb. threshold", "Taxon", "Prob. effect > 1", "Lower 95% CI", "Median", "Upper 95% CI"))
 ```
 
 \clearpage
