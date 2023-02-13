@@ -10,7 +10,7 @@ group_by(d, taxonomic_group, serial_number) %>%
   mutate(celeb_views = mean(celeb_average_daily_view, na.rm = TRUE)) %>%
   filter(celeb_views >= 1) %>%
   filter(species_average_daily_view > 0) %>%
-  summarise(.diff = species_average_daily_view[celebrity == 1] / species_average_daily_view[celebrity == 0], celeb_views = mean(celeb_views, na.rm = TRUE)) %>%
+  reframe(.diff = species_average_daily_view[celebrity == 1] / species_average_daily_view[celebrity == 0], celeb_views = mean(celeb_views, na.rm = TRUE)) %>%
   ggplot(aes(celeb_views, .diff)) +
   geom_point(alpha = 0.3) +
   scale_y_log10() +
@@ -18,7 +18,7 @@ group_by(d, taxonomic_group, serial_number) %>%
   facet_wrap(~taxonomic_group, scales = "fixed") +
   ggsidekick::theme_sleek() +
   geom_hline(yintercept = 1, lty = 2) +
-  geom_smooth(se = F, method = "rlm", colour = "red") +
+  geom_smooth(se = FALSE, method = "rlm", colour = "red", formula = y ~ x) +
   ylab("Ratio of average views\n(celebrity to non-celebrity species)") +
   xlab("Celebrity average page views")
 
