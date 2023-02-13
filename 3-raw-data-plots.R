@@ -19,7 +19,6 @@ group_by(d, taxonomic_group, serial_number) %>%
   ggsidekick::theme_sleek() +
   geom_hline(yintercept = 1, lty = 2) +
   geom_smooth(se = F, method = "rlm", colour = "red") +
-  # ggtitle("Celeb >= 1") +
   ylab("Ratio of average views\n(celebrity to non-celebrity species)") +
   xlab("Celebrity average page views")
 
@@ -42,7 +41,6 @@ zz %>%
   geom_point(position = position_jitter(height = 0, width = 0.1), alpha = 0.1) +
   geom_violin(draw_quantiles = c(0.5), alpha = 0.5, colour = "red") +
   scale_y_log10() +
-  # scale_x_log10() +
   coord_cartesian(ylim = c(0.05, 20)) +
   ggsidekick::theme_sleek() +
   geom_hline(yintercept = 1, lty = 2) +

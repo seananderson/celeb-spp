@@ -42,71 +42,68 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
     prior(lkj_corr_cholesky(1), class = "L")
 
   if (!independent_taxa) {
-  if (!include_celeb_views) {
-    if (family == "Gamma") {
-      if (model_disp) {
-        priors <- priors + prior(student_t(3, 0, 2.5), class = "b", dpar = "shape")
-        f <- bf(
-          species_average_daily_view ~
+    if (!include_celeb_views) {
+      if (family == "Gamma") {
+        if (model_disp) {
+          priors <- priors + prior(student_t(3, 0, 2.5), class = "b", dpar = "shape")
+          f <- bf(
+            species_average_daily_view ~
+              1 + celebrity +
+              (1 + celebrity | taxonomic_group) + (1 | serial_number),
+            shape ~ 0 + taxonomic_group
+          )
+        } else {
+          priors <- priors + prior(student_t(3, 0, 2.5), class = "shape")
+          f <- bf(species_average_daily_view ~
             1 + celebrity +
-            (1 + celebrity | taxonomic_group) + (1 | serial_number),
-          shape ~ 0 + taxonomic_group
-        )
-      } else {
-        priors <- priors + prior(student_t(3, 0, 2.5), class = "shape")
-        f <- bf(species_average_daily_view ~
+            (1 + celebrity | taxonomic_group) + (1 | serial_number))
+        }
+      }
+
+      if (family == "Student") {
+        if (model_disp) {
+          priors <- priors + prior(student_t(3, 0, 2.5), class = "b", dpar = "sigma")
+          f <- bf(
+            log(species_average_daily_view) ~
+              1 + celebrity +
+              (1 + celebrity | taxonomic_group) + (1 | serial_number),
+            sigma ~ 0 + taxonomic_group,
+            nu = .nu
+          )
+        } else {
+          priors <- priors + prior(student_t(3, 0, 2.5), class = "sigma")
+          f <- bf(log(species_average_daily_view) ~
+            1 + celebrity +
+            (1 + celebrity | taxonomic_group) + (1 | serial_number), nu = .nu)
+        }
+      }
+
+      if (family == "NB2") {
+        # priors <- priors + prior(gamma(0.01, 0.01), class = "shape")
+        priors <- priors + prior(student_t(3, 0, 5), class = "shape")
+        f <- bf(species_total_views ~
           1 + celebrity +
           (1 + celebrity | taxonomic_group) + (1 | serial_number))
       }
-    }
-
-    if (family == "Student") {
-      if (model_disp) {
-        priors <- priors + prior(student_t(3, 0, 2.5), class = "b", dpar = "sigma")
-          # prior(gamma(2, 0.1), class = "nu")
-          # prior(gamma(4, 1), class = "nu")
-        f <- bf(
-          log(species_average_daily_view) ~
-            1 + celebrity +
-            (1 + celebrity | taxonomic_group) + (1 | serial_number),
-          sigma ~ 0 + taxonomic_group, nu = .nu
-        )
-      } else {
-        priors <- priors + prior(student_t(3, 0, 2.5), class = "sigma")
-          # prior(gamma(2, 0.1), class = "nu")
-          # prior(gamma(4, 1), class = "nu")
-        f <- bf(log(species_average_daily_view) ~
-          1 + celebrity +
-          (1 + celebrity | taxonomic_group) + (1 | serial_number), nu = .nu)
+    } else {
+      if (family == "NB2") {
+        # priors <- priors + prior(gamma(0.01, 0.01), class = "shape")
+        priors <- priors + prior(student_t(3, 0, 5), class = "shape")
+        f <- bf(species_total_views ~
+          1 + celebrity * log(celeb_average_daily_view) +
+          (1 + celebrity * log(celeb_average_daily_view) | taxonomic_group) + (1 | serial_number))
       }
     }
-
-    if (family == "NB2") {
-      # priors <- priors + prior(gamma(0.01, 0.01), class = "shape")
-      priors <- priors + prior(student_t(3, 0, 5), class = "shape")
-      f <- bf(species_total_views ~
-        1 + celebrity +
-        (1 + celebrity | taxonomic_group) + (1 | serial_number))
-    }
-  } else {
-    if (family == "NB2") {
-      # priors <- priors + prior(gamma(0.01, 0.01), class = "shape")
-      priors <- priors + prior(student_t(3, 0, 5), class = "shape")
-      f <- bf(species_total_views ~
-        1 + celebrity * log(celeb_average_daily_view) +
-        (1 + celebrity * log(celeb_average_daily_view) | taxonomic_group) + (1 | serial_number))
-    }
-  }
   }
 
   if (independent_taxa) {
     priors <- prior(normal(0, 1), class = "b") +
       prior(normal(0, 5), class = "Intercept") +
       prior(student_t(3, 0, 2.5), class = "sd")
-      # prior(lkj_corr_cholesky(1), class = "L")
-      # prior(student_t(3, 0, 5), class = "shape")
+    # prior(lkj_corr_cholesky(1), class = "L")
+    # prior(student_t(3, 0, 5), class = "shape")
     f <- bf(species_total_views ~
-        1 + celebrity * taxonomic_group + (1 | serial_number), nu = .nu)
+      1 + celebrity * taxonomic_group + (1 | serial_number), nu = .nu)
   }
 
   brm(
@@ -241,11 +238,11 @@ XLAB <- xlab("ln average daily species views")
 g <- list()
 g[[1]] <- pp_check(fit1_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 1")
-g[[2]] <- pp_check(fit1_10_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB+
+g[[2]] <- pp_check(fit1_10_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 10")
-g[[3]] <- pp_check(fit1_100_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB+
+g[[3]] <- pp_check(fit1_100_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 100")
-g[[4]] <- pp_check(fit1_1000_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB+
+g[[4]] <- pp_check(fit1_1000_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 1000")
 cowplot::plot_grid(plotlist = g)
 ggsave("figs/st4-ppcheck.png", width = 10, height = 6)
@@ -256,44 +253,6 @@ get_draws <- function(fit) {
   filter(p1, param == "celebrity") |>
     left_join(p2)
 }
-
-# tidybayes::get_variables(fit1_10_nb_ind)
-# plot_violins <- function(draws_df) {
-#   ggplot(draws_df, aes(taxa, exp(b_celebrity + r_taxonomic_group))) +
-#     geom_hline(yintercept = 1, lty = 2) +
-#     geom_violin(fill = NA) +
-#     coord_flip() +
-#     xlab("") +
-#     ylab("Effect") +
-#     theme_light()
-# }
-
-# post2 <- readRDS("data-generated/nb2-models.rds")
-# draws <- get_draws(post2[[2]])
-# plot_violins(draws)
-
-# library(DHARMa)
-# post2 <- readRDS("data-generated/st4-models.rds")
-# post2 <- readRDS("data-generated/nb2-models.rds")
-# model <- post2[[4]]
-# dat <- dpos_1000
-# dat <- d_1000
-
-# model_check <- createDHARMa(
-#   simulatedResponse = t(posterior_predict(model, ndraws = 500L)),
-#   observedResponse = dat$species_total_views,
-#   fittedPredictedResponse = apply(t(posterior_epred(model)), 1L, mean),
-#   integerResponse = TRUE
-# )
-# plot(model_check)
-#
-# model_check_pos <- createDHARMa(
-#   simulatedResponse = t(posterior_predict(model, ndraws = 300L)),
-#   observedResponse = log(dat$species_average_daily_view),
-#   fittedPredictedResponse = apply(t(posterior_epred(model)), 1L, mean),
-#   integerResponse = TRUE
-# )
-# plot(model_check_pos)
 
 make_prob_table <- function(draws_df) {
   group_by(draws_df, taxa) |>
@@ -332,8 +291,10 @@ dot_line_plot <- function(post) {
     ggplot(aes(taxa, med, ymin = lwr, ymax = upr, colour = celeb)) +
     geom_hline(yintercept = 1, lty = 2) +
     geom_pointrange(position = position_dodge(width = 0.5)) +
-    geom_linerange(aes(ymin = lwr2, ymax = upr2), lwd = 1,
-      position = position_dodge(width = 0.5)) +
+    geom_linerange(aes(ymin = lwr2, ymax = upr2),
+      lwd = 1,
+      position = position_dodge(width = 0.5)
+    ) +
     coord_flip() +
     xlab("") +
     ylab("Multiplicative effect") +
@@ -372,31 +333,39 @@ fit_ml_models <- function(.x, .y, student = TRUE, df = 4) {
   dd <- dplyr::filter(dat, taxonomic_group == .x)
   dd$serial_number <- as.factor(dd$serial_number)
   fam <- if (student) sdmTMB::student(df = df) else gaussian()
-  m <- sdmTMB::sdmTMB(log(species_average_daily_view) ~
+  m <- sdmTMB::sdmTMB(
+    log(species_average_daily_view) ~
       celebrity + (1 | serial_number),
     data = dd, family = fam, spatial = "off", reml = TRUE,
     silent = FALSE
   )
-  cis <- sdmTMB::tidy(m, conf.int = TRUE)[2L,,drop=FALSE]
-  cis50 <- sdmTMB::tidy(m, conf.int = TRUE,
-    conf.level = 0.5)[2L,c("conf.low", "conf.high"),drop=FALSE]
+  cis <- sdmTMB::tidy(m, conf.int = TRUE)[2L, , drop = FALSE]
+  cis50 <- sdmTMB::tidy(m,
+    conf.int = TRUE,
+    conf.level = 0.5
+  )[2L, c("conf.low", "conf.high"), drop = FALSE]
   names(cis50) <- c("conf.low50", "conf.high50")
   data.frame(cis, cis50, taxa = .x, threshold = .y)
 }
 
-fits <- purrr::map2_dfr(all$tax, all$thresholds, function(.x, .y)
-  fit_ml_models(.x, .y, TRUE, df = 4))
+fits <- purrr::map2_dfr(all$tax, all$thresholds, function(.x, .y) {
+  fit_ml_models(.x, .y, TRUE, df = 4)
+})
 
 fits
 
-fits %>% filter(!is.na(conf.low)) %>%
+fits %>%
+  filter(!is.na(conf.low)) %>%
   ggplot(aes(taxa, exp(estimate),
     ymin = exp(conf.low), ymax = exp(conf.high),
-    colour = as.factor(threshold))) +
+    colour = as.factor(threshold)
+  )) +
   geom_hline(yintercept = 1, lty = 2) +
   geom_pointrange(position = position_dodge(width = 0.5)) +
-  geom_linerange(aes(ymin = exp(conf.low50), ymax = exp(conf.high50)), lwd = 1,
-    position = position_dodge(width = 0.5)) +
+  geom_linerange(aes(ymin = exp(conf.low50), ymax = exp(conf.high50)),
+    lwd = 1,
+    position = position_dodge(width = 0.5)
+  ) +
   coord_flip() +
   xlab("") +
   ylab("Multiplicative effect") +

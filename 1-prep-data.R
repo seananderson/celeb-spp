@@ -1,10 +1,5 @@
 library(dplyr)
 
-# 8000 strong dataset, half of which consists of species named after celebrity
-# (defined as a person who has a Wikipedia page with an average of 1 visit a day
-# for the last 6 years) and the other half of their closest phylogenetic
-# relative not named after a celebrity. Then I looked at average Wikipedia views
-# for all of those species.
 # d <- readr::read_csv(file = "data/raw/Celeb_Species_Reorg.csv")
 # d$Amphibian <- NULL
 # d$Bird <- NULL
@@ -30,12 +25,14 @@ nrow(d) - nrow(dpos)
 
 .med <- median(dpos$celeb_average_daily_view, na.rm = TRUE)
 .mean <- mean(dpos$celeb_average_daily_view, na.rm = TRUE)
-.quant80 <- as.numeric(quantile(dpos$celeb_average_daily_view, probs = 0.8,
-  na.rm = TRUE))
+.quant80 <- as.numeric(quantile(dpos$celeb_average_daily_view,
+  probs = 0.8,
+  na.rm = TRUE
+))
 
 dpos <- dpos |>
   group_by(serial_number) |>
-  mutate(above_med = max(celeb_average_daily_view, na.rm = TRUE) >= .med ) |>
+  mutate(above_med = max(celeb_average_daily_view, na.rm = TRUE) >= .med) |>
   mutate(above_mean = max(celeb_average_daily_view, na.rm = TRUE) >= .mean) |>
   mutate(above_1000 = max(celeb_average_daily_view, na.rm = TRUE) >= 1000) |>
   mutate(above_100 = max(celeb_average_daily_view, na.rm = TRUE) >= 100) |>
