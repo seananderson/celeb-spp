@@ -2,23 +2,17 @@ library(dplyr)
 library(ggplot2)
 library(brms)
 
+if (!require("cmdstanr", quietly = TRUE)) {
+  stop(
+    "Please install 'cmdstanr' and 'CmdStan':\n",
+    'https://mc-stan.org/cmdstanr/\n',
+    'https://mc-stan.org/cmdstanr/articles/cmdstanr.html'
+  )
+}
+
+
 source("1-prep-data.R")
 dir.create("figs", showWarnings = FALSE)
-
-# get_prior(bf(
-#   log(species_average_daily_view) ~ 1 + celebrity +
-#     (1 + celebrity | taxonomic_group) + (1 | serial_number),
-#   nu = 5
-# ),
-# data = dpos, family = student()
-# )
-#
-# get_prior(bf(
-#   species_average_daily_view ~ 1 + celebrity +
-#     (1 + celebrity | taxonomic_group) + (1 | serial_number)
-# ),
-# data = dpos, family = negbinomial()
-# )
 
 fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
                          family = c("Gamma", "Student", "NB2"), .nu = 5,
@@ -79,7 +73,6 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
       }
 
       if (family == "NB2") {
-        # priors <- priors + prior(gamma(0.01, 0.01), class = "shape")
         priors <- priors + prior(student_t(3, 0, 5), class = "shape")
         f <- bf(species_total_views ~
           1 + celebrity +
@@ -87,7 +80,6 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
       }
     } else {
       if (family == "NB2") {
-        # priors <- priors + prior(gamma(0.01, 0.01), class = "shape")
         priors <- priors + prior(student_t(3, 0, 5), class = "shape")
         f <- bf(species_total_views ~
           1 + celebrity * log(celeb_average_daily_view) +
@@ -100,8 +92,6 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
     priors <- prior(normal(0, 1), class = "b") +
       prior(normal(0, 5), class = "Intercept") +
       prior(student_t(3, 0, 2.5), class = "sd")
-    # prior(lkj_corr_cholesky(1), class = "L")
-    # prior(student_t(3, 0, 5), class = "shape")
     f <- bf(species_total_views ~
       1 + celebrity * taxonomic_group + (1 | serial_number), nu = .nu)
   }
@@ -119,8 +109,8 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
   )
 }
 
-ITER <- 2000L
-CHAINS <- 4L
+ITER <- 200L
+CHAINS <- 1L
 
 fit1_nb <- fit_brms_mod(d,
   iter = ITER, model_disp = FALSE,
