@@ -6,6 +6,9 @@ library(brms)
 source("1-prep-data.R")
 dir.create("figs", showWarnings = FALSE)
 
+taxa_order <- rev(c("Invertebrate", "Fish", "Amphibian", "Reptile", "Bird", "Mammal"))
+d$taxonomic_group <- factor(d$taxonomic_group, levels = taxa_order)
+
 group_by(d, taxonomic_group, serial_number) %>%
   mutate(celeb_views = mean(celeb_average_daily_view, na.rm = TRUE)) %>%
   filter(celeb_views >= 1) %>%
@@ -23,6 +26,7 @@ group_by(d, taxonomic_group, serial_number) %>%
   xlab("Celebrity average page views")
 
 ggsave("figs/raw-dat-rlm.png", width = 9, height = 5)
+ggsave("figs/raw-dat-rlm.pdf", width = 9, height = 5)
 
 xx <- group_by(dpos, taxonomic_group, serial_number) %>%
   summarise(
@@ -49,3 +53,4 @@ zz %>%
   facet_wrap(~taxonomic_group, scales = "fixed")
 
 ggsave("figs/raw-dat-violin.png", width = 9, height = 5)
+ggsave("figs/raw-dat-violin.pdf", width = 9, height = 5)
