@@ -5,11 +5,9 @@ library(brms)
 if (!require("cmdstanr", quietly = TRUE)) {
   stop(
     "Please install 'cmdstanr' and 'CmdStan':\n",
-    'https://mc-stan.org/cmdstanr/\n',
-    'https://mc-stan.org/cmdstanr/articles/cmdstanr.html'
+    "https://mc-stan.org/cmdstanr/"
   )
 }
-
 
 source("1-prep-data.R")
 dir.create("figs", showWarnings = FALSE)
@@ -109,8 +107,8 @@ fit_brms_mod <- function(dat, model_disp = FALSE, iter = 500L, chains = 4L,
   )
 }
 
-ITER <- 2000L
-CHAINS <- 4L
+ITER <- 1000L
+CHAINS <- 8L
 
 fit1_nb <- fit_brms_mod(d,
   iter = ITER, model_disp = FALSE,
@@ -212,13 +210,13 @@ bayesplot::bayesplot_theme_set(theme_light())
 g <- list()
 XLAB <- xlab("Species page views")
 YLAB <- ylab("Density")
-g[[1]] <- pp_check(fit1_nb, ndraws = 25) + scale_x_log10() +
+g[[1]] <- pp_check(m_nb2[[1]], ndraws = 25) + scale_x_log10() +
   ggtitle("Celebrity threshold: 1") + XLAB + YLAB
-g[[2]] <- pp_check(fit1_10_nb, ndraws = 25) + scale_x_log10() +
+g[[2]] <- pp_check(m_nb2[[2]], ndraws = 25) + scale_x_log10() +
   ggtitle("Celebrity threshold: 10") + XLAB + YLAB
-g[[3]] <- pp_check(fit1_100_nb, ndraws = 25) + scale_x_log10() +
+g[[3]] <- pp_check(m_nb2[[3]], ndraws = 25) + scale_x_log10() +
   ggtitle("Celebrity threshold: 100") + XLAB + YLAB
-g[[4]] <- pp_check(fit1_1000_nb, ndraws = 25) + scale_x_log10() +
+g[[4]] <- pp_check(m_nb2[[4]], ndraws = 25) + scale_x_log10() +
   ggtitle("Celebrity threshold: 1000") + XLAB + YLAB
 cowplot::plot_grid(plotlist = g)
 ggsave("figs/nb2-ppcheck.png", width = 10, height = 6)
@@ -226,13 +224,13 @@ ggsave("figs/nb2-ppcheck.png", width = 10, height = 6)
 XLIM <- xlim(-10, 10)
 XLAB <- xlab("ln average daily species views")
 g <- list()
-g[[1]] <- pp_check(fit1_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
+g[[1]] <- pp_check(m_st4[[1]], ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 1")
-g[[2]] <- pp_check(fit1_10_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
+g[[2]] <- pp_check(m_st4[[2]], ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 10")
-g[[3]] <- pp_check(fit1_100_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
+g[[3]] <- pp_check(m_st4[[3]], ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 100")
-g[[4]] <- pp_check(fit1_1000_st_nu4, ndraws = 25) + XLIM + XLAB + YLAB +
+g[[4]] <- pp_check(m_st4[[4]], ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 1000")
 cowplot::plot_grid(plotlist = g)
 ggsave("figs/st4-ppcheck.png", width = 10, height = 6)
@@ -267,6 +265,8 @@ saveRDS(tb, "data-generated/st4-probs.rds")
 knitr::kable(tb, digits = 2L)
 
 dot_line_plot <- function(post) {
+  taxa_order <- c("Invertebrate", "Fish", "Amphibian", "Reptile", "Bird", "Mammal")
+  post$taxa <- factor(post$taxa, levels = taxa_order)
   post %>%
     # filter(celeb != "Celeb1000") %>%
     mutate(effect = exp(b_celebrity + r_taxonomic_group)) %>%
@@ -309,9 +309,10 @@ ggsave("figs/dot-line-1-1000-st4.png", width = 5, height = 5)
 
 # independent models ------------------------------------------------
 
-tax <- c("Amphibian", "Bird", "Fish", "Invertebrate", "Mammal", "Reptile")
+# tax <- c("Amphibian", "Bird", "Fish", "Invertebrate", "Mammal", "Reptile")
+taxa_order <- c("Invertebrate", "Fish", "Amphibian", "Reptile", "Bird", "Mammal")
 thresholds <- c(1, 10, 100, 1000)
-all <- expand.grid(tax = tax, thresholds = thresholds)
+all <- expand.grid(tax = taxa_order, thresholds = thresholds)
 
 fit_ml_models <- function(.x, .y, student = TRUE, df = 4) {
   print(paste(.x, .y))
@@ -344,6 +345,8 @@ fits <- purrr::map2_dfr(all$tax, all$thresholds, function(.x, .y) {
 
 fits
 
+taxa_order <- c("Invertebrate", "Fish", "Amphibian", "Reptile", "Bird", "Mammal")
+fits$taxa <- factor(fits$taxa, levels = taxa_order)
 fits %>%
   filter(!is.na(conf.low)) %>%
   ggplot(aes(taxa, exp(estimate),
