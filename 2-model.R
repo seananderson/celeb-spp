@@ -177,12 +177,15 @@ ggplot(p2, aes(exp(b_celebrity), colour = threshold, fill = threshold)) +
   geom_density(alpha = 0.1, colour = NA) +
   geom_density(fill = NA) +
   coord_cartesian(xlim = c(0.8, 2.5)) +
-  scale_colour_brewer(palette = "Dark2") +
-  scale_fill_brewer(palette = "Dark2") +
+  # scale_colour_brewer(palette = "Dark2") +
+  # scale_fill_brewer(palette = "Dark2") +
+  scale_colour_viridis_d(end = 0.9) +
+  scale_fill_viridis_d(end = 0.9) +
   theme_light() +
   scale_y_continuous(expand = expansion(mult = c(0, .02))) +
   labs(colour = col_lab, fill = col_lab, y = "Density", x = "Multiplicative celebrity effect\nacross taxonomic groups")
 ggsave("figs/global-effect-st4.png", width = 7, height = 4)
+ggsave("figs/global-effect-st4.pdf", width = 7, height = 4)
 
 saveRDS(p2, "data-generated/global-posterior-st4.rds")
 
@@ -195,12 +198,15 @@ ggplot(p2, aes(exp(b_celebrity), colour = threshold, fill = threshold)) +
   geom_density(alpha = 0.1, colour = NA) +
   geom_density(fill = NA) +
   coord_cartesian(xlim = c(0.8, 2.5)) +
-  scale_colour_brewer(palette = "Dark2") +
-  scale_fill_brewer(palette = "Dark2") +
+  # scale_colour_brewer(palette = "Dark2") +
+  # scale_fill_brewer(palette = "Dark2") +
+  scale_colour_viridis_d(end = 0.9) +
+  scale_fill_viridis_d(end = 0.9) +
   theme_light() +
   scale_y_continuous(expand = expansion(mult = c(0, .02))) +
   labs(colour = col_lab, fill = col_lab, y = "Density", x = "Multiplicative celebrity effect\nacross taxonomic groups")
 ggsave("figs/global-effect-nb2.png", width = 7, height = 4)
+ggsave("figs/global-effect-nb2.pdf", width = 7, height = 4)
 
 saveRDS(p2, "data-generated/global-posterior-nb2.rds")
 
@@ -220,6 +226,7 @@ g[[4]] <- pp_check(m_nb2[[4]], ndraws = 25) + scale_x_log10() +
   ggtitle("Celebrity threshold: 1000") + XLAB + YLAB
 cowplot::plot_grid(plotlist = g)
 ggsave("figs/nb2-ppcheck.png", width = 10, height = 6)
+ggsave("figs/nb2-ppcheck.pdf", width = 10, height = 6)
 
 XLIM <- xlim(-10, 10)
 XLAB <- xlab("ln average daily species views")
@@ -234,6 +241,7 @@ g[[4]] <- pp_check(m_st4[[4]], ndraws = 25) + XLIM + XLAB + YLAB +
   ggtitle("Celebrity threshold: 1000")
 cowplot::plot_grid(plotlist = g)
 ggsave("figs/st4-ppcheck.png", width = 10, height = 6)
+ggsave("figs/st4-ppcheck.pdf", width = 10, height = 6)
 
 get_draws <- function(fit) {
   p1 <- tidybayes::spread_draws(fit, r_taxonomic_group[taxa, param])
@@ -268,7 +276,6 @@ dot_line_plot <- function(post) {
   taxa_order <- c("Invertebrate", "Fish", "Amphibian", "Reptile", "Bird", "Mammal")
   post$taxa <- factor(post$taxa, levels = taxa_order)
   post %>%
-    # filter(celeb != "Celeb1000") %>%
     mutate(effect = exp(b_celebrity + r_taxonomic_group)) %>%
     group_by(taxa, celeb) %>%
     summarise(
@@ -300,12 +307,14 @@ pp <- purrr::map_dfr(m_nb2, function(.x) {
 }, .id = "celeb")
 dot_line_plot(pp)
 ggsave("figs/dot-line-1-1000-nb2.png", width = 5, height = 5)
+ggsave("figs/dot-line-1-1000-nb2.pdf", width = 5, height = 5)
 
 pp <- purrr::map_dfr(m_st4, function(.x) {
   get_draws(.x)
 }, .id = "celeb")
 dot_line_plot(pp)
 ggsave("figs/dot-line-1-1000-st4.png", width = 5, height = 5)
+ggsave("figs/dot-line-1-1000-st4.pdf", width = 5, height = 5)
 
 # independent models ------------------------------------------------
 
@@ -369,3 +378,4 @@ fits %>%
   labs(colour = "Celebrity\nviews\nthreshold")
 
 ggsave("figs/independent-sdmTMB-models-student-4.png", width = 5, height = 5)
+ggsave("figs/independent-sdmTMB-models-student-4.pdf", width = 5, height = 5)
